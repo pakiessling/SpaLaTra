@@ -1,0 +1,37 @@
+executor: slurm
+
+default-resources:
+    mem_mb: 150_000
+    gpu: 0
+    slurm_account: p0020567
+    runtime: 720
+    cpus_per_task: 5
+
+set-resources:
+    consensus:
+        mem_mb: 50_000
+        cpus_per_task: 1
+    tacco:
+        mem_mb: 50_000
+        cpus_per_task: 4
+    singler:
+        mem_mb: 120_000
+        cpus_per_task: 20
+    insitutype:
+        mem_mb: 50_000
+        cpus_per_task: 4
+    phispace:
+        mem_mb: 150_000
+        cpus_per_task: 4
+
+restart-times: 0
+max-jobs-per-second: 50
+max-status-checks-per-second: 1
+local-cores: 1
+latency-wait: 60
+jobs: 500
+keep-going: True
+rerun-incomplete: True
+printshellcmds: True
+scheduler: greedy
+use-conda: True
