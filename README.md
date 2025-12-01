@@ -1,0 +1,2 @@
+# SpaLaTra
+Spatial label transfer
