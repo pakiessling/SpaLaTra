@@ -1,25 +1,35 @@
 import glob
 import os
 
+configfile: "config/config.yaml"
+
 INPUT_FILES = glob.glob(os.path.join(config["input"], '*.h5ad'))
 SAMPLE_IDS = [os.path.splitext(os.path.basename(f))[0] for f in INPUT_FILES]
 
-os.makedirs(os.path.join(config["output"], "phispace"), exist_ok=True)
-os.makedirs(os.path.join(config["output"], "tacco"), exist_ok=True)
-os.makedirs(os.path.join(config["output"], "singler"), exist_ok=True)
-os.makedirs(os.path.join(config["output"], "rctd"), exist_ok=True)
-os.makedirs(os.path.join(config["output"], "insitutype"), exist_ok=True)
+ALL_METHODS = ["tacco", "singler", "rctd", "phispace", "insitutype"]
+METHODS = config.get("methods", ALL_METHODS)
+
+for m in METHODS:
+    if m not in ALL_METHODS:
+        raise ValueError(f"Unknown method '{m}'. Valid options: {ALL_METHODS}")
+if len(METHODS) < 2:
+    raise ValueError("At least 2 methods must be enabled for a meaningful consensus.")
+
+for m in METHODS:
+    os.makedirs(os.path.join(config["output"], m), exist_ok=True)
 os.makedirs(os.path.join(config["output"], "logs"), exist_ok=True)
+
+def method_outputs(methods, sample_ids, output_dir):
+    return [
+        expand(os.path.join(output_dir, m, "{sample}_" + m + ".csv"), sample=sample_ids)
+        for m in methods
+    ]
 
 localrules: all
 
 rule all:
     input:
-        expand(os.path.join(config["output"], "phispace", "{sample}_phispace.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "tacco", "{sample}_tacco.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "singler", "{sample}_singler.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "rctd", "{sample}_rctd.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "insitutype", "{sample}_insitutype.csv"), sample=SAMPLE_IDS),
+        method_outputs(METHODS, SAMPLE_IDS, config["output"]),
         os.path.join(config["output"], "consensus.csv"),
         os.path.join(config["output"], "report.html")
     shell:
@@ -105,22 +115,20 @@ rule insitutype:
 
 rule consensus:
     input:
-        expand(os.path.join(config["output"], "phispace", "{sample}_phispace.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "tacco", "{sample}_tacco.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "singler", "{sample}_singler.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "rctd", "{sample}_rctd.csv"), sample=SAMPLE_IDS),
-        expand(os.path.join(config["output"], "insitutype", "{sample}_insitutype.csv"), sample=SAMPLE_IDS)
+        method_outputs(METHODS, SAMPLE_IDS, config["output"])
     output:
         os.path.join(config["output"], "consensus.csv")
     conda:
         "environment.yml"
     log:
         os.path.join(config["output"], "logs", "consensus.log")
+    params:
+        methods = " ".join(METHODS)
     resources:
         mem_mb=50000,
         cpus_per_task=1
     shell:
-        "python scripts/combine.py --input {config[output]} --output {output} > {log} 2>&1"
+        "python scripts/combine.py --input {config[output]} --methods {params.methods} --output {output} > {log} 2>&1"
 
 rule report:
     input:

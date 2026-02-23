@@ -1,0 +1,20 @@
+# SPaLaTra pipeline configuration
+# Edit this file to configure a run, then execute: ./launch.sh
+
+# --- Required ---
+input: "input/xenium_hs"       # Directory of query .h5ad files
+output: "result/xenium_hs"     # Output directory
+ref: "references/scrna_hs.h5ad"  # Reference single-cell .h5ad
+
+# --- Methods ---
+# Disable individual methods by removing them from this list.
+# At least 2 are required for a meaningful consensus.
+methods:
+  - tacco
+  - singler
+  - rctd
+  - phispace
+  - insitutype
+
+# --- Visualization ---
+embedding: spatial   # obsm key used for plotting in report.html

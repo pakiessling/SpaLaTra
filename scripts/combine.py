@@ -15,7 +15,16 @@ parser.add_argument(
     type=str,
     help="Path to the output CSV file where the combined results will be saved.",
 )
+parser.add_argument(
+    "--methods",
+    type=str,
+    nargs="+",
+    default=["tacco", "singler", "rctd", "phispace", "insitutype"],
+    help="Active methods to include in the consensus.",
+)
 args = parser.parse_args()
+
+ACTIVE_METHODS = set(args.methods)
 
 
 def process_phispace(df):
@@ -114,17 +123,17 @@ for root, dirs, files in os.walk(args.input):
             else:
                 raise ValueError(f"Unknown file: {path}")
 
-# Empty-list guards
-if not tacco_dfs:
-    raise ValueError("No tacco CSV files found in input directory")
-if not rctd_dfs:
-    raise ValueError("No rctd CSV files found in input directory")
-if not singler_dfs:
-    raise ValueError("No singler CSV files found in input directory")
-if not phispace_dfs:
-    raise ValueError("No phispace CSV files found in input directory")
-if not insitutype_dfs:
-    raise ValueError("No insitutype CSV files found in input directory")
+# Guard: only check for CSVs from active methods
+method_dfs = {
+    "tacco": tacco_dfs,
+    "rctd": rctd_dfs,
+    "singler": singler_dfs,
+    "phispace": phispace_dfs,
+    "insitutype": insitutype_dfs,
+}
+for method in ACTIVE_METHODS:
+    if not method_dfs[method]:
+        raise ValueError(f"No {method} CSV files found in input directory")
 
 # Validate index uniqueness per method before concatenating
 def _check_unique(dfs, method_name):
@@ -135,22 +144,17 @@ def _check_unique(dfs, method_name):
             f"Duplicate cell indices found across {method_name} CSV files: {list(dupes[:10])}"
         )
 
-_check_unique(tacco_dfs, "tacco")
-_check_unique(rctd_dfs, "rctd")
-_check_unique(singler_dfs, "singler")
-_check_unique(phispace_dfs, "phispace")
-_check_unique(insitutype_dfs, "insitutype")
+for method in ACTIVE_METHODS:
+    _check_unique(method_dfs[method], method)
 
-tacco = pd.concat(tacco_dfs)
-rctd = pd.concat(rctd_dfs)
-singler = pd.concat(singler_dfs)
-phispace = pd.concat(phispace_dfs)
-insitutype = pd.concat(insitutype_dfs)
+# Concatenate and join only active methods
+combined = pd.concat(method_dfs[args.methods[0]])
+for method in args.methods[1:]:
+    combined = combined.join(pd.concat(method_dfs[method]))
 
-combined = tacco.join(rctd).join(singler).join(phispace).join(insitutype)
-
-PRIMARY_COLS = ["tacco", "rctd", "singler", "phispace", "insitutype"]
-SECONDARY_COLS = ["tacco_2nd", "phispace_2nd", "rctd_2nd"]
+# Build primary/secondary col lists from active methods
+PRIMARY_COLS = [c for c in ["tacco", "rctd", "singler", "phispace", "insitutype"] if c in ACTIVE_METHODS]
+SECONDARY_COLS = [c for c in ["tacco_2nd", "phispace_2nd", "rctd_2nd"] if c.split("_2nd")[0] in ACTIVE_METHODS]
 
 combined["consensus"] = combined.apply(
     plurality_consensus, axis=1, primary_cols=PRIMARY_COLS, secondary_cols=SECONDARY_COLS
