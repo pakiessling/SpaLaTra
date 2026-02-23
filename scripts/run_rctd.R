@@ -34,6 +34,10 @@ parser <- add_argument(parser, "--ref_column",
     help = "Which cell type column to use",
     default = "cell_subtype"
 )
+parser <- add_argument(parser, "--max_cores",
+    help = "Maximum number of cores for RCTD",
+    default = 4L
+)
 
 args <- parse_args(parser)
 
@@ -70,7 +74,7 @@ sample <- SpatialRNA(coords, input_counts,require_int = FALSE) # support for SPL
 
 # low quality samples tend to crash
 tryCatch({
-  myRCTD <- create.RCTD(sample, reference, max_cores = 4) # -1 , multi core slow
+  myRCTD <- create.RCTD(sample, reference, max_cores = args$max_cores)
   myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
   rds_path = gsub(".csv", ".rds", args$output)
   saveRDS(myRCTD, file = rds_path)
