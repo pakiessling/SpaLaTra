@@ -41,6 +41,11 @@ def main():
         "--res_column", type=str, help="Column where result should be saved", default="tacco"
     )
     parse.add_argument(
+        "--sample_column",
+        type=str,
+        help="Column in reference obs identifying donors/batches, used to set multi_center",
+    )
+    parse.add_argument(
         "--layer",
         type=str,
         help="What layer in the reference to use",
@@ -71,7 +76,10 @@ def main():
         full_adata.X = np.round(full_adata.X).astype(np.float64)
 
     # Set multi_center parameter
-    args.mc = ref.obs.Donor.nunique() if args.mc is None else args.mc
+    if args.mc is None and args.sample_column and args.sample_column in ref.obs.columns:
+        args.mc = ref.obs[args.sample_column].nunique()
+    elif args.mc is None:
+        args.mc = 1
 
     final_results = label_transfer(
         full_adata, ref, ct_column=args.ct_column, res_column=args.res_column, multi_center=args.mc

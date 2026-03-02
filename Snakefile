@@ -76,8 +76,13 @@ rule tacco:
     resources:
         mem_mb=50000,
         cpus_per_task=4
+    params:
+        sample_col_arg = lambda wildcards: (
+            f"--sample_column {config['sample_column']}"
+            if config.get('sample_column') else ""
+        )
     shell:
-        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --output {output} > {log} 2>&1"
+        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --output {output} {params.sample_col_arg} > {log} 2>&1"
 
 rule phispace:
     input:
