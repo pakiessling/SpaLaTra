@@ -1,19 +1,9 @@
-# Check for required packages and install if needed
-required_packages <- c("anndataR", "spacexr")
-for (pkg in required_packages) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-        if (pkg == "anndataR") {
-            pak::pak("scverse/anndataR@v0.1.0")
-        }
-        if (pkg == "spacexr") {
-            pak::pak("jpromeror/spacexr@33d375cc5d7b7b5db97ee5cc1d3dd32b682afc9e")
-        } else {
-            install.packages(pkg, repos = "https://cran.uni-muenster.de/")
-        }
-    }
+if (!requireNamespace("anndataR", quietly = TRUE)) {
+    pak::pak("scverse/anndataR@v0.1.0")
 }
-
-#pak::pak("dmcable/spacexr")
+if (!requireNamespace("spacexr", quietly = TRUE)) {
+    pak::pak("jpromeror/spacexr@33d375cc5d7b7b5db97ee5cc1d3dd32b682afc9e")
+}
 
 suppressPackageStartupMessages({
     library(anndataR)
@@ -26,23 +16,33 @@ parser <- arg_parser("Annotate spatial transcriptomics with SPLIT")
 parser <- add_argument(parser, "--input", help = "Path to h5ad")
 parser <- add_argument(parser, "--ref", help = "Path to h5ad")
 parser <- add_argument(parser, "--output", help = "Output path for csv")
-parser <- add_argument(parser, "--layer",
+parser <- add_argument(
+    parser,
+    "--layer",
     help = "Which matrix to use in the reference",
     default = "X"
 )
-parser <- add_argument(parser, "--ref_column",
+parser <- add_argument(
+    parser,
+    "--ref_column",
     help = "Which cell type column to use",
     default = "cell_subtype"
 )
-parser <- add_argument(parser, "--max_cores",
+parser <- add_argument(
+    parser,
+    "--max_cores",
     help = "Maximum number of cores for RCTD",
     default = 4L
 )
-parser <- add_argument(parser, "--sample_column",
+parser <- add_argument(
+    parser,
+    "--sample_column",
     help = "obs column used to split multi-section h5ads before RCTD (avoids overlapping coordinates)",
     default = NA
 )
-parser <- add_argument(parser, "--UMI_min",
+parser <- add_argument(
+    parser,
+    "--UMI_min",
     help = "Minimum UMI count per cell passed to create.RCTD (0 = no filtering)",
     default = 0L
 )
@@ -68,58 +68,123 @@ rownames(coords) <- input$obs_names
 # remove genes occuring in less than 4 cells to avoid errors in RCTD
 ref_counts_filt <- ref_counts[rowSums(ref_counts) > 3, ]
 
-run_rctd_on_cells <- function(sub_counts, sub_coords, ref_counts_filt, cell_type, max_cores, UMI_min = 0) {
+run_rctd_on_cells <- function(
+    sub_counts,
+    sub_coords,
+    ref_counts_filt,
+    cell_type,
+    max_cores,
+    UMI_min = 0
+) {
     sub_counts <- sub_counts[rowSums(sub_counts) > 3, , drop = FALSE]
     co_genes <- intersect(rownames(ref_counts_filt), rownames(sub_counts))
     cat("[RCTD debug] co_genes:", length(co_genes), "\n")
-    cat("[RCTD debug] query cells:", ncol(sub_counts), "| query genes before intersect:", nrow(sub_counts), "\n")
-    cat("[RCTD debug] ref cells:", ncol(ref_counts_filt), "| ref genes before intersect:", nrow(ref_counts_filt), "\n")
+    cat(
+        "[RCTD debug] query cells:",
+        ncol(sub_counts),
+        "| query genes before intersect:",
+        nrow(sub_counts),
+        "\n"
+    )
+    cat(
+        "[RCTD debug] ref cells:",
+        ncol(ref_counts_filt),
+        "| ref genes before intersect:",
+        nrow(ref_counts_filt),
+        "\n"
+    )
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
     ct_table <- table(cell_type)
-    cat("[RCTD debug] cell types in ref:", length(ct_table), "| min cells per type:", min(ct_table), "| max:", max(ct_table), "\n")
+    cat(
+        "[RCTD debug] cell types in ref:",
+        length(ct_table),
+        "| min cells per type:",
+        min(ct_table),
+        "| max:",
+        max(ct_table),
+        "\n"
+    )
     cat("[RCTD debug] cell types with < 25 cells:", sum(ct_table < 25), "\n")
-    cat("[RCTD debug] UMI_min:", UMI_min, "| counts_MIN: 0 (overridden from default 10)\n")
+    cat(
+        "[RCTD debug] UMI_min:",
+        UMI_min,
+        "| counts_MIN: 0 (overridden from default 10)\n"
+    )
     per_cell_counts <- colSums(sub_counts)
-    cat("[RCTD debug] query counts in co_genes — min:", min(per_cell_counts),
-        "| median:", median(per_cell_counts), "| max:", max(per_cell_counts), "\n")
-    cat("[RCTD debug] cells with co_gene counts < 10:", sum(per_cell_counts < 10), "\n")
+    cat(
+        "[RCTD debug] query counts in co_genes — min:",
+        min(per_cell_counts),
+        "| median:",
+        median(per_cell_counts),
+        "| max:",
+        max(per_cell_counts),
+        "\n"
+    )
+    cat(
+        "[RCTD debug] cells with co_gene counts < 10:",
+        sum(per_cell_counts < 10),
+        "\n"
+    )
     reference <- Reference(sub_ref, cell_type, require_int = FALSE)
     sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
-    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores, UMI_min = UMI_min, counts_MIN = 0)
+    myRCTD <- create.RCTD(
+        sample,
+        reference,
+        max_cores = max_cores,
+        UMI_min = UMI_min,
+        counts_MIN = 0
+    )
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
     results <- myRCTD@results$results_df
-    cat("[RCTD debug] results_df rows:", if (is.null(results)) "NULL" else nrow(results), "\n")
+    cat(
+        "[RCTD debug] results_df rows:",
+        if (is.null(results)) "NULL" else nrow(results),
+        "\n"
+    )
     results
 }
 
 # low quality samples tend to crash
-tryCatch({
-    if (!is.na(args$sample_column)) {
-        sample_ids <- unique(input$obs[[args$sample_column]])
-        parts <- lapply(sample_ids, function(sid) {
-            mask <- input$obs[[args$sample_column]] == sid
-            run_rctd_on_cells(
-                input_counts[, mask, drop = FALSE],
-                coords[mask, , drop = FALSE],
-                ref_counts_filt, cell_type, args$max_cores, args$UMI_min
+tryCatch(
+    {
+        if (!is.na(args$sample_column)) {
+            sample_ids <- unique(input$obs[[args$sample_column]])
+            parts <- lapply(sample_ids, function(sid) {
+                mask <- input$obs[[args$sample_column]] == sid
+                run_rctd_on_cells(
+                    input_counts[, mask, drop = FALSE],
+                    coords[mask, , drop = FALSE],
+                    ref_counts_filt,
+                    cell_type,
+                    args$max_cores,
+                    args$UMI_min
+                )
+            })
+            result <- do.call(rbind, parts)
+        } else {
+            result <- run_rctd_on_cells(
+                input_counts,
+                coords,
+                ref_counts_filt,
+                cell_type,
+                args$max_cores,
+                args$UMI_min
             )
-        })
-        result <- do.call(rbind, parts)
-    } else {
-        result <- run_rctd_on_cells(input_counts, coords, ref_counts_filt, cell_type, args$max_cores, args$UMI_min)
+        }
+        if (is.null(result) || nrow(result) == 0) {
+            stop("RCTD returned NULL or empty results_df")
+        }
+        write.csv(result, file = args$output, row.names = TRUE)
+    },
+    error = function(e) {
+        cat("Error occurred:", conditionMessage(e), "\n")
+        cat("Saving empty CSV as output due to error.\n")
+        error_df <- data.frame(
+            spot_class = rep("?", ncol(input_counts)),
+            first_type = rep("?", ncol(input_counts)),
+            row.names = colnames(input_counts)
+        )
+        write.csv(error_df, file = args$output, row.names = TRUE)
     }
-    if (is.null(result) || nrow(result) == 0) {
-        stop("RCTD returned NULL or empty results_df")
-    }
-    write.csv(result, file = args$output, row.names = TRUE)
-}, error = function(e) {
-    cat("Error occurred:", conditionMessage(e), "\n")
-    cat("Saving empty CSV as output due to error.\n")
-    error_df <- data.frame(
-        spot_class = rep("?", ncol(input_counts)),
-        first_type = rep("?", ncol(input_counts)),
-        row.names = colnames(input_counts)
-    )
-    write.csv(error_df, file = args$output, row.names = TRUE)
-})
+)
