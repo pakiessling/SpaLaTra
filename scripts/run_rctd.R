@@ -42,6 +42,10 @@ parser <- add_argument(parser, "--sample_column",
     help = "obs column used to split multi-section h5ads before RCTD (avoids overlapping coordinates)",
     default = NA
 )
+parser <- add_argument(parser, "--UMI_min",
+    help = "Minimum UMI count per cell passed to create.RCTD (0 = no filtering)",
+    default = 0L
+)
 
 args <- parse_args(parser)
 
@@ -64,14 +68,14 @@ rownames(coords) <- input$obs_names
 # remove genes occuring in less than 4 cells to avoid errors in RCTD
 ref_counts_filt <- ref_counts[rowSums(ref_counts) > 3, ]
 
-run_rctd_on_cells <- function(sub_counts, sub_coords, ref_counts_filt, cell_type, max_cores) {
+run_rctd_on_cells <- function(sub_counts, sub_coords, ref_counts_filt, cell_type, max_cores, UMI_min = 0) {
     sub_counts <- sub_counts[rowSums(sub_counts) > 3, , drop = FALSE]
     co_genes <- intersect(rownames(ref_counts_filt), rownames(sub_counts))
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
     reference <- Reference(sub_ref, cell_type, require_int = FALSE)
     sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
-    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores)
+    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores, UMI_min = UMI_min)
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
     myRCTD@results$results_df
 }
@@ -85,12 +89,15 @@ tryCatch({
             run_rctd_on_cells(
                 input_counts[, mask, drop = FALSE],
                 coords[mask, , drop = FALSE],
-                ref_counts_filt, cell_type, args$max_cores
+                ref_counts_filt, cell_type, args$max_cores, args$UMI_min
             )
         })
         result <- do.call(rbind, parts)
     } else {
-        result <- run_rctd_on_cells(input_counts, coords, ref_counts_filt, cell_type, args$max_cores)
+        result <- run_rctd_on_cells(input_counts, coords, ref_counts_filt, cell_type, args$max_cores, args$UMI_min)
+    }
+    if (is.null(result) || nrow(result) == 0) {
+        stop("RCTD returned NULL or empty results_df")
     }
     write.csv(result, file = args$output, row.names = TRUE)
 }, error = function(e) {
