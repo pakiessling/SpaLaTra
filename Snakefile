@@ -74,7 +74,7 @@ rule tacco:
     log:
         os.path.join(config["output"], "logs", "tacco_{sample}.log")
     resources:
-        mem_mb=50000,
+        mem_mb=100_000,
         cpus_per_task=4
     params:
         sample_col_arg = lambda wildcards: (
