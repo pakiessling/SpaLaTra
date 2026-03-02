@@ -41,6 +41,7 @@ All pipeline settings live here. Edit this file before running.
 | `methods` | no | List of methods to run; defaults to all five. Minimum 2 required. |
 | `ref_column` | no | Column in reference `.h5ad` with cell type labels (default: `cell_subtype`) |
 | `embedding` | no | `obsm` key for report plots (default: `spatial`) |
+| `sample_column` | no | `obs` column identifying tissue sections; if set, RCTD runs per-section to avoid overlapping coordinate issues |
 
 Example — run only three methods:
 ```yaml

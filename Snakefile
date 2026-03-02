@@ -107,8 +107,15 @@ rule rctd:
     resources:
         mem_mb=150000,
         cpus_per_task=5
+    params:
+        sample_col_arg = lambda wildcards: (
+            f"--sample_column {config['sample_column']}"
+            if config.get('sample_column') else ""
+        )
     shell:
-        "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} --max_cores {threads} > {log} 2>&1"
+        "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} "
+        "--ref_column {config[ref_column]} --output {output} "
+        "--max_cores {threads} {params.sample_col_arg} > {log} 2>&1"
 
 rule insitutype:
     input:

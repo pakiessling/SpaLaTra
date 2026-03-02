@@ -19,5 +19,11 @@ methods:
 # --- Reference annotation column ---
 ref_column: cell_subtype  # Column in the reference .h5ad that contains cell type labels
 
+# --- RCTD spatial splitting ---
+# If your h5ad contains multiple tissue sections with overlapping coordinates,
+# set this to the obs column that identifies each section (e.g. "donor_id").
+# RCTD will then be run independently per section.
+# sample_column: donor_id
+
 # --- Visualization ---
 embedding: spatial   # obsm key used for plotting in report.html

@@ -38,17 +38,19 @@ parser <- add_argument(parser, "--max_cores",
     help = "Maximum number of cores for RCTD",
     default = 4L
 )
+parser <- add_argument(parser, "--sample_column",
+    help = "obs column used to split multi-section h5ads before RCTD (avoids overlapping coordinates)",
+    default = NA
+)
 
 args <- parse_args(parser)
 
 input <- read_h5ad(args$input)
 ref <- read_h5ad(args$ref, to = "SingleCellExperiment", x_mapping = "counts")
 
-
 ref_counts <- counts(ref)
 cell_type <- ref[[args$ref_column]]
 names(cell_type) <- colnames(ref_counts)
-
 
 input_counts <- as(input$X, "CsparseMatrix")
 input_counts <- Matrix::t(input_counts)
@@ -59,36 +61,45 @@ coords <- as.data.frame(coords)
 colnames(coords) <- c("x", "y")
 rownames(coords) <- input$obs_names
 
-
 # remove genes occuring in less than 4 cells to avoid errors in RCTD
-ref_counts <- ref_counts[rowSums(ref_counts) > 3, ]
-input_counts <- input_counts[rowSums(input_counts) > 3, ]
-co_genes <- intersect(rownames(ref_counts), rownames(input_counts))
-ref_counts <- ref_counts[co_genes, ]
-input_counts <- input_counts[co_genes, ]
+ref_counts_filt <- ref_counts[rowSums(ref_counts) > 3, ]
 
-
-reference <- Reference(ref_counts, cell_type,require_int = FALSE)
-sample <- SpatialRNA(coords, input_counts,require_int = FALSE) # support for SPLIT
-
+run_rctd_on_cells <- function(sub_counts, sub_coords, ref_counts_filt, cell_type, max_cores) {
+    sub_counts <- sub_counts[rowSums(sub_counts) > 3, , drop = FALSE]
+    co_genes <- intersect(rownames(ref_counts_filt), rownames(sub_counts))
+    sub_ref <- ref_counts_filt[co_genes, ]
+    sub_counts <- sub_counts[co_genes, ]
+    reference <- Reference(sub_ref, cell_type, require_int = FALSE)
+    sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
+    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores)
+    myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
+    myRCTD@results$results_df
+}
 
 # low quality samples tend to crash
 tryCatch({
-  myRCTD <- create.RCTD(sample, reference, max_cores = args$max_cores)
-  myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
-  rds_path = gsub(".csv", ".rds", args$output)
-  saveRDS(myRCTD, file = rds_path)
-  result <- myRCTD@results$results_df
-  write.csv(result, file = args$output, row.names = TRUE)
+    if (!is.na(args$sample_column)) {
+        sample_ids <- unique(input$obs[[args$sample_column]])
+        parts <- lapply(sample_ids, function(sid) {
+            mask <- input$obs[[args$sample_column]] == sid
+            run_rctd_on_cells(
+                input_counts[, mask, drop = FALSE],
+                coords[mask, , drop = FALSE],
+                ref_counts_filt, cell_type, args$max_cores
+            )
+        })
+        result <- do.call(rbind, parts)
+    } else {
+        result <- run_rctd_on_cells(input_counts, coords, ref_counts_filt, cell_type, args$max_cores)
+    }
+    write.csv(result, file = args$output, row.names = TRUE)
 }, error = function(e) {
-
-  cat("Error occurred:", conditionMessage(e), "\n")
-  cat("Saving empty CSV as output due to error.\n")
-  # Save empty CSV
+    cat("Error occurred:", conditionMessage(e), "\n")
+    cat("Saving empty CSV as output due to error.\n")
     error_df <- data.frame(
-    spot_class = rep("?", ncol(input_counts)),
-    first_type = rep("?", ncol(input_counts)),
-    row.names = colnames(input_counts)
-  )
-  write.csv(error_df, file = args$output, row.names = TRUE)
+        spot_class = rep("?", ncol(input_counts)),
+        first_type = rep("?", ncol(input_counts)),
+        row.names = colnames(input_counts)
+    )
+    write.csv(error_df, file = args$output, row.names = TRUE)
 })
