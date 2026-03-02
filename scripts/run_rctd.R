@@ -84,8 +84,16 @@ run_rctd_on_cells <- function(
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
     ct_table <- table(cell_type)
+    rare_types <- names(ct_table[ct_table < 25])
+    if (length(rare_types) > 0) {
+        message("[RCTD debug] dropping ", length(rare_types), " cell type(s) with < 25 cells: ",
+            paste(rare_types, collapse = ", "))
+        keep_cells <- !cell_type %in% rare_types
+        sub_ref <- sub_ref[, keep_cells, drop = FALSE]
+        cell_type <- droplevels(factor(cell_type[keep_cells]))
+        ct_table <- table(cell_type)
+    }
     message("[RCTD debug] cell types in ref: ", length(ct_table), " | min cells per type: ", min(ct_table), " | max: ", max(ct_table))
-    message("[RCTD debug] cell types with < 25 cells: ", sum(ct_table < 25))
     message("[RCTD debug] UMI_min: ", UMI_min, " | counts_MIN: 0 (overridden from default 10)")
     per_cell_counts <- colSums(sub_counts)
     message("[RCTD debug] query counts in co_genes — min: ", min(per_cell_counts),
