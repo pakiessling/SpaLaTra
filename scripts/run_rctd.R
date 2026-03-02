@@ -110,8 +110,17 @@ run_rctd_on_cells <- function(
 tryCatch(
     {
         if (!is.na(args$sample_column)) {
+            if (!args$sample_column %in% colnames(input$obs)) {
+                stop(sprintf(
+                    "sample_column '%s' not found in obs. Available columns: %s",
+                    args$sample_column,
+                    paste(colnames(input$obs), collapse = ", ")
+                ))
+            }
             sample_ids <- unique(input$obs[[args$sample_column]])
+            message("[RCTD debug] sample_column='", args$sample_column, "' | sections found: ", length(sample_ids), " | IDs: ", paste(sample_ids, collapse = ", "))
             parts <- lapply(sample_ids, function(sid) {
+                message("[RCTD debug] --- processing section: ", sid, " ---")
                 mask <- input$obs[[args$sample_column]] == sid
                 run_rctd_on_cells(
                     input_counts[, mask, drop = FALSE],
@@ -122,6 +131,7 @@ tryCatch(
                     args$UMI_min
                 )
             })
+            message("[RCTD debug] parts returned: ", length(parts), " | non-null parts: ", sum(!sapply(parts, is.null)))
             result <- do.call(rbind, parts)
         } else {
             result <- run_rctd_on_cells(
