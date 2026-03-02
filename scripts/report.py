@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 
 parser = argparse.ArgumentParser(description="Generate SPaLaTra QC report")
 parser.add_argument("--consensus", required=True, help="Path to consensus.csv")
-parser.add_argument("--input", required=True, help="Directory of query .h5ad files")
+parser.add_argument("--input", required=True, help="Directory of query .h5ad files, or path to a single .h5ad file")
 parser.add_argument("--output", required=True, help="Output HTML path")
 parser.add_argument(
     "--embedding", default="spatial", help="obsm key for spatial coordinates"
@@ -19,7 +19,10 @@ parser.add_argument(
 args = parser.parse_args()
 
 # ── Load spatial coordinates ──────────────────────────────────────────────────
-h5ad_files = glob.glob(os.path.join(args.input, "*.h5ad"))
+if os.path.isfile(args.input) and args.input.endswith(".h5ad"):
+    h5ad_files = [args.input]
+else:
+    h5ad_files = glob.glob(os.path.join(args.input, "*.h5ad"))
 if not h5ad_files:
     raise FileNotFoundError(f"No .h5ad files found in {args.input}")
 

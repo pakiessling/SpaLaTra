@@ -3,8 +3,20 @@ import os
 
 configfile: "config/config.yaml"
 
-INPUT_FILES = glob.glob(os.path.join(config["input"], '*.h5ad'))
-SAMPLE_IDS = [os.path.splitext(os.path.basename(f))[0] for f in INPUT_FILES]
+_input = config["input"]
+if os.path.isfile(_input) and _input.endswith(".h5ad"):
+    INPUT_FILES = [_input]
+    SAMPLE_IDS = [os.path.splitext(os.path.basename(_input))[0]]
+    INPUT_DIR = os.path.dirname(os.path.abspath(_input))
+else:
+    INPUT_FILES = glob.glob(os.path.join(_input, '*.h5ad'))
+    SAMPLE_IDS = [os.path.splitext(os.path.basename(f))[0] for f in INPUT_FILES]
+    INPUT_DIR = _input
+
+def get_sample_input(wildcards):
+    if os.path.isfile(config["input"]) and config["input"].endswith(".h5ad"):
+        return config["input"]
+    return os.path.join(INPUT_DIR, wildcards.sample + ".h5ad")
 
 ALL_METHODS = ["tacco", "singler", "rctd", "phispace", "insitutype"]
 METHODS = config.get("methods", ALL_METHODS)
@@ -39,7 +51,7 @@ rule all:
 
 rule singler:
     input:
-        config["input"] + "/{sample}.h5ad"
+        get_sample_input
     output:
         os.path.join(config["output"], "singler", "{sample}_singler.csv")
     conda:
@@ -54,7 +66,7 @@ rule singler:
 
 rule tacco:
     input:
-        config["input"] + "/{sample}.h5ad"
+        get_sample_input
     output:
         os.path.join(config["output"], "tacco", "{sample}_tacco.csv")
     conda:
@@ -69,7 +81,7 @@ rule tacco:
 
 rule phispace:
     input:
-        config["input"] + "/{sample}.h5ad"
+        get_sample_input
     output:
         os.path.join(config["output"], "phispace", "{sample}_phispace.csv")
     conda:
@@ -84,7 +96,7 @@ rule phispace:
 
 rule rctd:
     input:
-        config["input"] + "/{sample}.h5ad"
+        get_sample_input
     output:
         os.path.join(config["output"], "rctd", "{sample}_rctd.csv")
     conda:
@@ -100,7 +112,7 @@ rule rctd:
 
 rule insitutype:
     input:
-        config["input"] + "/{sample}.h5ad"
+        get_sample_input
     output:
         os.path.join(config["output"], "insitutype", "{sample}_insitutype.csv")
     conda:
@@ -133,7 +145,7 @@ rule consensus:
 rule report:
     input:
         consensus = os.path.join(config["output"], "consensus.csv"),
-        samples = expand(config["input"] + "/{sample}.h5ad", sample=SAMPLE_IDS)
+        samples = INPUT_FILES
     output:
         os.path.join(config["output"], "report.html")
     conda:

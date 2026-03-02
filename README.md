@@ -42,7 +42,7 @@ nano config/config.yaml
 All settings are in **`config/config.yaml`**. Edit this file before running the pipeline.
 
 ```yaml
-input:  "input/xenium_hs"          # directory of query .h5ad files
+input:  "input/xenium_hs"          # directory of query .h5ad files, or path to a single .h5ad file
 output: "result/xenium_hs"         # output directory
 ref:    "references/scrna_hs.h5ad" # reference single-cell .h5ad
 
@@ -66,7 +66,7 @@ To use an alternate config file (e.g., for a different experiment):
 
 ## Input Requirements
 
-**Query `.h5ad` files** (all files in `input/` are processed):
+**Query `.h5ad` files** — `input` can be a directory (all `.h5ad` files processed) or a path to a single `.h5ad` file:
 
 | Requirement | Detail |
 |---|---|
