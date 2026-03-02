@@ -1,16 +1,9 @@
 # Check for required packages and install if needed
-required_packages <- c("anndataR",  "PhiSpace")
-for (pkg in required_packages) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-        if (pkg == "anndataR") {
-            pak::pak("scverse/anndataR@v0.1.0")
-        }
-        if (pkg == "PhiSpace") {
-            pak::pak("jiadongm/PhiSpace/pkg@0af720f")
-        } else {
-            install.packages(pkg)
-        }
-    }
+if (!requireNamespace("anndataR", quietly = TRUE)) {
+    pak::pak("scverse/anndataR@v0.1.0")
+}
+if (!requireNamespace("PhiSpace", quietly = TRUE)) {
+    pak::pak("jiadongm/PhiSpace/pkg@0af720f")
 }
 
 suppressPackageStartupMessages({
