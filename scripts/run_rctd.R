@@ -78,54 +78,19 @@ run_rctd_on_cells <- function(
 ) {
     sub_counts <- sub_counts[rowSums(sub_counts) > 3, , drop = FALSE]
     co_genes <- intersect(rownames(ref_counts_filt), rownames(sub_counts))
-    cat("[RCTD debug] co_genes:", length(co_genes), "\n")
-    cat(
-        "[RCTD debug] query cells:",
-        ncol(sub_counts),
-        "| query genes before intersect:",
-        nrow(sub_counts),
-        "\n"
-    )
-    cat(
-        "[RCTD debug] ref cells:",
-        ncol(ref_counts_filt),
-        "| ref genes before intersect:",
-        nrow(ref_counts_filt),
-        "\n"
-    )
+    message("[RCTD debug] co_genes: ", length(co_genes))
+    message("[RCTD debug] query cells: ", ncol(sub_counts), " | query genes before intersect: ", nrow(sub_counts))
+    message("[RCTD debug] ref cells: ", ncol(ref_counts_filt), " | ref genes before intersect: ", nrow(ref_counts_filt))
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
     ct_table <- table(cell_type)
-    cat(
-        "[RCTD debug] cell types in ref:",
-        length(ct_table),
-        "| min cells per type:",
-        min(ct_table),
-        "| max:",
-        max(ct_table),
-        "\n"
-    )
-    cat("[RCTD debug] cell types with < 25 cells:", sum(ct_table < 25), "\n")
-    cat(
-        "[RCTD debug] UMI_min:",
-        UMI_min,
-        "| counts_MIN: 0 (overridden from default 10)\n"
-    )
+    message("[RCTD debug] cell types in ref: ", length(ct_table), " | min cells per type: ", min(ct_table), " | max: ", max(ct_table))
+    message("[RCTD debug] cell types with < 25 cells: ", sum(ct_table < 25))
+    message("[RCTD debug] UMI_min: ", UMI_min, " | counts_MIN: 0 (overridden from default 10)")
     per_cell_counts <- colSums(sub_counts)
-    cat(
-        "[RCTD debug] query counts in co_genes — min:",
-        min(per_cell_counts),
-        "| median:",
-        median(per_cell_counts),
-        "| max:",
-        max(per_cell_counts),
-        "\n"
-    )
-    cat(
-        "[RCTD debug] cells with co_gene counts < 10:",
-        sum(per_cell_counts < 10),
-        "\n"
-    )
+    message("[RCTD debug] query counts in co_genes — min: ", min(per_cell_counts),
+        " | median: ", median(per_cell_counts), " | max: ", max(per_cell_counts))
+    message("[RCTD debug] cells with co_gene counts < 10: ", sum(per_cell_counts < 10))
     reference <- Reference(sub_ref, cell_type, require_int = FALSE)
     sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
     myRCTD <- create.RCTD(
@@ -137,11 +102,7 @@ run_rctd_on_cells <- function(
     )
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
     results <- myRCTD@results$results_df
-    cat(
-        "[RCTD debug] results_df rows:",
-        if (is.null(results)) "NULL" else nrow(results),
-        "\n"
-    )
+    message("[RCTD debug] results_df rows: ", if (is.null(results)) "NULL" else nrow(results))
     results
 }
 
