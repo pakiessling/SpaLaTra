@@ -62,7 +62,7 @@ rule singler:
         mem_mb=120000,
         cpus_per_task=20
     shell:
-        "Rscript scripts/run_singler.R --input {input} --ref {config[ref]} --output {output} > {log} 2>&1"
+        "Rscript scripts/run_singler.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} > {log} 2>&1"
 
 rule tacco:
     input:
@@ -77,7 +77,7 @@ rule tacco:
         mem_mb=50000,
         cpus_per_task=4
     shell:
-        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --output {output} > {log} 2>&1"
+        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --output {output} > {log} 2>&1"
 
 rule phispace:
     input:
@@ -92,7 +92,7 @@ rule phispace:
         mem_mb=150000,
         cpus_per_task=4
     shell:
-        "Rscript scripts/run_phi_space.R --input {input} --ref {config[ref]} --output {output} > {log} 2>&1"
+        "Rscript scripts/run_phi_space.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} > {log} 2>&1"
 
 rule rctd:
     input:
@@ -108,7 +108,7 @@ rule rctd:
         mem_mb=150000,
         cpus_per_task=5
     shell:
-        "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} --output {output} --max_cores {threads} > {log} 2>&1"
+        "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} --max_cores {threads} > {log} 2>&1"
 
 rule insitutype:
     input:
@@ -123,7 +123,7 @@ rule insitutype:
         mem_mb=50000,
         cpus_per_task=4
     shell:
-        "Rscript scripts/run_insitutype.R --input {input} --ref {config[ref]} --output {output} > {log} 2>&1"
+        "Rscript scripts/run_insitutype.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} > {log} 2>&1"
 
 rule consensus:
     input:

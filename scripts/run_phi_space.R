@@ -44,7 +44,7 @@ ref <- logTransf(ref, use_log1p = T) # assayName = args$layer,
 print("Starting PhiSpace")
 PhiRes <- PhiSpaceR_1ref(
     ref, input,
-    phenotypes = "cell_subtype", PhiSpaceAssay = "data",
+    phenotypes = args$ref_column, PhiSpaceAssay = "data",
     regMethod = "PLS", center = T, scale = F
 )
 res <- PhiRes$PhiSpaceScore

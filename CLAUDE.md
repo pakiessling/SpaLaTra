@@ -39,6 +39,7 @@ All pipeline settings live here. Edit this file before running.
 | `output` | yes | Output directory |
 | `ref` | yes | Reference single-cell `.h5ad` file |
 | `methods` | no | List of methods to run; defaults to all five. Minimum 2 required. |
+| `ref_column` | no | Column in reference `.h5ad` with cell type labels (default: `cell_subtype`) |
 | `embedding` | no | `obsm` key for report plots (default: `spatial`) |
 
 Example — run only three methods:

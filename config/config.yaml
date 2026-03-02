@@ -16,5 +16,8 @@ methods:
   - phispace
   - insitutype
 
+# --- Reference annotation column ---
+ref_column: cell_subtype  # Column in the reference .h5ad that contains cell type labels
+
 # --- Visualization ---
 embedding: spatial   # obsm key used for plotting in report.html
