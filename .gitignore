@@ -1,0 +1,6 @@
+.snakemake/*
+logs/*
+results/*
+query.json
+.runtime_profile/
+results/*
