@@ -167,5 +167,7 @@ rule report:
     resources:
         mem_mb=50000,
         cpus_per_task=1
+    params:
+        embedding = config.get("embedding", "spatial")
     shell:
-        "python scripts/report.py --consensus {input.consensus} --input {config[input]} --output {output} --embedding {config.get('embedding', 'spatial')} > {log} 2>&1"
+        "python scripts/report.py --consensus {input.consensus} --input {config[input]} --output {output} --embedding {params.embedding} > {log} 2>&1"
