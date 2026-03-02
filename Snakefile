@@ -91,10 +91,10 @@ rule rctd:
         "environment.yml"
     log:
         os.path.join(config["output"], "logs", "rctd_{sample}.log")
+    threads: 5
     resources:
         mem_mb=150000,
         cpus_per_task=5
-    threads: resources.cpus_per_task
     shell:
         "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} --output {output} --max_cores {threads} > {log} 2>&1"
 
