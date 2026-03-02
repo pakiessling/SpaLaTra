@@ -71,13 +71,26 @@ ref_counts_filt <- ref_counts[rowSums(ref_counts) > 3, ]
 run_rctd_on_cells <- function(sub_counts, sub_coords, ref_counts_filt, cell_type, max_cores, UMI_min = 0) {
     sub_counts <- sub_counts[rowSums(sub_counts) > 3, , drop = FALSE]
     co_genes <- intersect(rownames(ref_counts_filt), rownames(sub_counts))
+    cat("[RCTD debug] co_genes:", length(co_genes), "\n")
+    cat("[RCTD debug] query cells:", ncol(sub_counts), "| query genes before intersect:", nrow(sub_counts), "\n")
+    cat("[RCTD debug] ref cells:", ncol(ref_counts_filt), "| ref genes before intersect:", nrow(ref_counts_filt), "\n")
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
+    ct_table <- table(cell_type)
+    cat("[RCTD debug] cell types in ref:", length(ct_table), "| min cells per type:", min(ct_table), "| max:", max(ct_table), "\n")
+    cat("[RCTD debug] cell types with < 25 cells:", sum(ct_table < 25), "\n")
+    cat("[RCTD debug] UMI_min:", UMI_min, "| counts_MIN: 0 (overridden from default 10)\n")
+    per_cell_counts <- colSums(sub_counts)
+    cat("[RCTD debug] query counts in co_genes — min:", min(per_cell_counts),
+        "| median:", median(per_cell_counts), "| max:", max(per_cell_counts), "\n")
+    cat("[RCTD debug] cells with co_gene counts < 10:", sum(per_cell_counts < 10), "\n")
     reference <- Reference(sub_ref, cell_type, require_int = FALSE)
     sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
-    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores, UMI_min = UMI_min)
+    myRCTD <- create.RCTD(sample, reference, max_cores = max_cores, UMI_min = UMI_min, counts_MIN = 0)
     myRCTD <- run.RCTD(myRCTD, doublet_mode = "doublet")
-    myRCTD@results$results_df
+    results <- myRCTD@results$results_df
+    cat("[RCTD debug] results_df rows:", if (is.null(results)) "NULL" else nrow(results), "\n")
+    results
 }
 
 # low quality samples tend to crash
