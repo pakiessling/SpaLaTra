@@ -46,6 +46,12 @@ parser <- add_argument(
     help = "Minimum UMI count per cell passed to create.RCTD (0 = no filtering)",
     default = 0L
 )
+parser <- add_argument(
+    parser,
+    "--section",
+    help = "Process only cells where sample_column == this value (for parallel mode)",
+    default = NA
+)
 
 args <- parse_args(parser)
 
@@ -67,6 +73,17 @@ rownames(coords) <- input$obs_names
 
 # remove genes occuring in less than 4 cells to avoid errors in RCTD
 ref_counts_filt <- ref_counts[rowSums(ref_counts) > 3, ]
+
+# Determine active cell set (single-section parallel mode vs. full dataset)
+if (!is.na(args$section)) {
+    if (is.na(args$sample_column)) stop("--section requires --sample_column")
+    mask <- as.character(input$obs[[args$sample_column]]) == args$section
+    active_counts <- input_counts[, mask, drop = FALSE]
+    active_coords <- coords[mask, , drop = FALSE]
+} else {
+    active_counts <- input_counts
+    active_coords <- coords
+}
 
 run_rctd_on_cells <- function(
     sub_counts,
@@ -131,7 +148,20 @@ run_rctd_on_cells <- function(
 # low quality samples tend to crash
 tryCatch(
     {
-        if (!is.na(args$sample_column)) {
+        if (!is.na(args$section)) {
+            # single-section parallel mode (dispatched by Snakemake)
+            message("[RCTD debug] --- processing section (parallel): ", args$section, " ---")
+            message("[RCTD debug] active cells: ", ncol(active_counts))
+            result <- run_rctd_on_cells(
+                active_counts,
+                active_coords,
+                ref_counts_filt,
+                cell_type,
+                args$max_cores,
+                args$UMI_min
+            )
+        } else if (!is.na(args$sample_column)) {
+            # original sequential loop (still works if called directly)
             if (!args$sample_column %in% colnames(input$obs)) {
                 stop(sprintf(
                     "sample_column '%s' not found in obs. Available columns: %s",
@@ -157,8 +187,8 @@ tryCatch(
             result <- do.call(rbind, parts)
         } else {
             result <- run_rctd_on_cells(
-                input_counts,
-                coords,
+                active_counts,
+                active_coords,
                 ref_counts_filt,
                 cell_type,
                 args$max_cores,
@@ -174,9 +204,9 @@ tryCatch(
         cat("Error occurred:", conditionMessage(e), "\n")
         cat("Saving empty CSV as output due to error.\n")
         error_df <- data.frame(
-            spot_class = rep("?", ncol(input_counts)),
-            first_type = rep("?", ncol(input_counts)),
-            row.names = colnames(input_counts)
+            spot_class = rep("?", ncol(active_counts)),
+            first_type = rep("?", ncol(active_counts)),
+            row.names = colnames(active_counts)
         )
         write.csv(error_df, file = args$output, row.names = TRUE)
     }

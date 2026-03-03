@@ -23,6 +23,18 @@ set-resources:
     phispace:
         mem_mb: 150_000
         cpus_per_task: 4
+    rctd_list_sections:
+        mem_mb: 8_000
+        cpus_per_task: 1
+        runtime: 30
+    rctd_one_section:
+        mem_mb: 50_000
+        cpus_per_task: 5
+        runtime: 90
+    rctd_merge_sections:
+        mem_mb: 16_000
+        cpus_per_task: 1
+        runtime: 15
 
 restart-times: 0
 max-jobs-per-second: 50

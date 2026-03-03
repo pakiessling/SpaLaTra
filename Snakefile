@@ -33,6 +33,10 @@ for m in METHODS:
 LOG_DIR = config.get("log_dir", os.path.join(config["output"], "logs"))
 os.makedirs(LOG_DIR, exist_ok=True)
 
+wildcard_constraints:
+    sample  = r"[^/]+",
+    section = r"[^/]+"
+
 def method_outputs(methods, sample_ids, output_dir):
     return [
         expand(os.path.join(output_dir, m, "{sample}_" + m + ".csv"), sample=sample_ids)
@@ -101,28 +105,88 @@ rule phispace:
     shell:
         "Rscript scripts/run_phi_space.R --input {input} --ref {config[ref]} --ref_column {config[ref_column]} --output {output} > {log} 2>&1"
 
-rule rctd:
-    input:
-        get_sample_input
-    output:
-        os.path.join(config["output"], "rctd", "{sample}_rctd.csv")
-    conda:
-        "environment.yml"
-    log:
-        os.path.join(LOG_DIR,"rctd_{sample}.log")
-    threads: 5
-    resources:
-        mem_mb=150000,
-        cpus_per_task=5
-    params:
-        sample_col_arg = lambda wildcards: (
-            f"--sample_column {config['sample_column']}"
-            if config.get('sample_column') else ""
+if config.get("sample_column"):
+
+    def _load_section_manifest(path):
+        mapping = {}
+        with open(path) as fh:
+            for line in fh:
+                sane, orig = line.rstrip("\n").split("\t", 1)
+                mapping[sane] = orig
+        return mapping
+
+    checkpoint rctd_list_sections:
+        input:  get_sample_input
+        output: os.path.join(config["output"], "rctd", "sections", "{sample}_sections.txt")
+        log:    os.path.join(LOG_DIR, "rctd_list_sections_{sample}.log")
+        resources: mem_mb=8_000, cpus_per_task=1
+        shell:
+            "python scripts/list_rctd_sections.py "
+            "--input {input} "
+            "--sample_column {config[sample_column]} "
+            "--output {output} > {log} 2>&1"
+
+    rule rctd_one_section:
+        input:
+            query    = get_sample_input,
+            manifest = lambda wc: checkpoints.rctd_list_sections.get(
+                           sample=wc.sample).output[0]
+        output:
+            os.path.join(config["output"], "rctd", "sections", "{sample}", "{section}_rctd.csv")
+        log:
+            os.path.join(LOG_DIR, "rctd_{sample}_{section}.log")
+        threads: 5
+        resources: mem_mb=50_000, cpus_per_task=5
+        params:
+            orig_section = lambda wc: _load_section_manifest(
+                checkpoints.rctd_list_sections.get(sample=wc.sample).output[0]
+            )[wc.section],
+            ref_column = config.get("ref_column", "cell_subtype")
+        shell:
+            "Rscript scripts/run_rctd.R "
+            "--input {input.query} --ref {config[ref]} "
+            "--ref_column {params.ref_column} --output {output} "
+            "--max_cores {threads} "
+            "--sample_column {config[sample_column]} "
+            "--section '{params.orig_section}' "
+            "> {log} 2>&1"
+
+    def _rctd_section_csvs(wildcards):
+        manifest = checkpoints.rctd_list_sections.get(sample=wildcards.sample).output[0]
+        sane_names = list(_load_section_manifest(manifest).keys())
+        return expand(
+            os.path.join(config["output"], "rctd", "sections", "{sample}", "{section}_rctd.csv"),
+            sample=wildcards.sample, section=sane_names
         )
-    shell:
-        "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} "
-        "--ref_column {config[ref_column]} --output {output} "
-        "--max_cores {threads} {params.sample_col_arg} > {log} 2>&1"
+
+    rule rctd_merge_sections:
+        input:  _rctd_section_csvs
+        output: os.path.join(config["output"], "rctd", "{sample}_rctd.csv")
+        log:    os.path.join(LOG_DIR, "rctd_merge_{sample}.log")
+        resources: mem_mb=16_000, cpus_per_task=1
+        run:
+            import pandas as pd
+            dfs = [pd.read_csv(f, index_col=0) for f in input]
+            pd.concat(dfs).to_csv(output[0])
+
+else:
+    rule rctd:
+        input:
+            get_sample_input
+        output:
+            os.path.join(config["output"], "rctd", "{sample}_rctd.csv")
+        conda:
+            "environment.yml"
+        log:
+            os.path.join(LOG_DIR,"rctd_{sample}.log")
+        threads: 5
+        resources:
+            mem_mb=150000,
+            cpus_per_task=5
+        shell:
+            "Rscript scripts/run_rctd.R --input {input} --ref {config[ref]} "
+            "--ref_column {config[ref_column]} --output {output} "
+            "--max_cores {threads} > {log} 2>&1"
 
 rule insitutype:
     input:
