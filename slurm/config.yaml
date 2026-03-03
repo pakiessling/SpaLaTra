@@ -12,7 +12,7 @@ set-resources:
         mem_mb: 50_000
         cpus_per_task: 1
     tacco:
-        mem_mb: 100_000
+        mem_mb: 180_000
         cpus_per_task: 4
     singler:
         mem_mb: 120_000
