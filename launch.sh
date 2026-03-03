@@ -72,9 +72,13 @@ echo ""
 if [[ -n "$DRY_RUN" ]]; then
     eval "$CMD"
 else
-    mkdir -p "$SCRIPT_DIR/logs"
-    LOG="$SCRIPT_DIR/logs/pipeline_$(date +%Y%m%d_%H%M%S).log"
+    RUN_ID="$(date +%Y%m%d_%H%M%S)"
+    LOG_DIR="$SCRIPT_DIR/logs/$RUN_ID"
+    mkdir -p "$LOG_DIR"
+    CMD="$CMD --config log_dir=\"$LOG_DIR\""
+    LOG="$LOG_DIR/pipeline.log"
     nohup bash -c "$CMD" > "$LOG" 2>&1 &
     echo "Pipeline started in background. PID: $!"
+    echo "Run logs: $LOG_DIR"
     echo "Monitor progress: tail -f $LOG"
 fi

@@ -29,7 +29,9 @@ if len(METHODS) < 2:
 
 for m in METHODS:
     os.makedirs(os.path.join(config["output"], m), exist_ok=True)
-os.makedirs(os.path.join(config["output"], "logs"), exist_ok=True)
+
+LOG_DIR = config.get("log_dir", os.path.join(config["output"], "logs"))
+os.makedirs(LOG_DIR, exist_ok=True)
 
 def method_outputs(methods, sample_ids, output_dir):
     return [
@@ -57,7 +59,7 @@ rule singler:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "singler_{sample}.log")
+        os.path.join(LOG_DIR,"singler_{sample}.log")
     resources:
         mem_mb=120000,
         cpus_per_task=20
@@ -72,7 +74,7 @@ rule tacco:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "tacco_{sample}.log")
+        os.path.join(LOG_DIR,"tacco_{sample}.log")
     resources:
         mem_mb=100_000,
         cpus_per_task=4
@@ -92,7 +94,7 @@ rule phispace:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "phispace_{sample}.log")
+        os.path.join(LOG_DIR,"phispace_{sample}.log")
     resources:
         mem_mb=150000,
         cpus_per_task=4
@@ -107,7 +109,7 @@ rule rctd:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "rctd_{sample}.log")
+        os.path.join(LOG_DIR,"rctd_{sample}.log")
     threads: 5
     resources:
         mem_mb=150000,
@@ -130,7 +132,7 @@ rule insitutype:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "insitutype_{sample}.log")
+        os.path.join(LOG_DIR,"insitutype_{sample}.log")
     resources:
         mem_mb=50000,
         cpus_per_task=4
@@ -145,7 +147,7 @@ rule consensus:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "consensus.log")
+        os.path.join(LOG_DIR,"consensus.log")
     params:
         methods = " ".join(METHODS)
     resources:
@@ -163,7 +165,7 @@ rule report:
     conda:
         "environment.yml"
     log:
-        os.path.join(config["output"], "logs", "report.log")
+        os.path.join(LOG_DIR,"report.log")
     resources:
         mem_mb=50000,
         cpus_per_task=1
