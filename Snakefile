@@ -119,6 +119,7 @@ if config.get("sample_column"):
         input:  get_sample_input
         output: os.path.join(config["output"], "rctd", "sections", "{sample}_sections.txt")
         log:    os.path.join(LOG_DIR, "rctd_list_sections_{sample}.log")
+        conda:  "environment.yml"
         resources: mem_mb=8_000, cpus_per_task=1
         shell:
             "python scripts/list_rctd_sections.py "
@@ -135,6 +136,7 @@ if config.get("sample_column"):
             os.path.join(config["output"], "rctd", "sections", "{sample}", "{section}_rctd.csv")
         log:
             os.path.join(LOG_DIR, "rctd_{sample}_{section}.log")
+        conda:  "environment.yml"
         threads: 5
         resources: mem_mb=50_000, cpus_per_task=5
         params:
@@ -163,6 +165,7 @@ if config.get("sample_column"):
         input:  _rctd_section_csvs
         output: os.path.join(config["output"], "rctd", "{sample}_rctd.csv")
         log:    os.path.join(LOG_DIR, "rctd_merge_{sample}.log")
+        conda:  "environment.yml"
         resources: mem_mb=16_000, cpus_per_task=1
         run:
             import pandas as pd
