@@ -83,6 +83,20 @@ run_rctd_on_cells <- function(
     message("[RCTD debug] ref cells: ", ncol(ref_counts_filt), " | ref genes before intersect: ", nrow(ref_counts_filt))
     sub_ref <- ref_counts_filt[co_genes, ]
     sub_counts <- sub_counts[co_genes, ]
+    # Reference() filters cells below min_UMI (default 100) in the co-gene space.
+    # With only ~451 co-genes, many cell types lose most of their cells.
+    # We set min_UMI = 1 in Reference() and pre-filter to the same threshold so
+    # ct_table accurately reflects the cells Reference() will actually keep.
+    ref_umi_min <- 1
+    ref_cell_totals <- colSums(sub_ref)
+    keep_ref_cells <- ref_cell_totals >= ref_umi_min
+    n_ref_dropped <- sum(!keep_ref_cells)
+    if (n_ref_dropped > 0) {
+        message("[RCTD debug] dropping ", n_ref_dropped, " ref cells with 0 UMI in co_genes (",
+                ncol(sub_ref) - n_ref_dropped, " remaining)")
+        sub_ref   <- sub_ref[, keep_ref_cells, drop = FALSE]
+        cell_type <- cell_type[keep_ref_cells]
+    }
     ct_table <- table(cell_type)
     rare_types <- names(ct_table[ct_table < 25])
     if (length(rare_types) > 0) {
@@ -99,7 +113,7 @@ run_rctd_on_cells <- function(
     message("[RCTD debug] query counts in co_genes — min: ", min(per_cell_counts),
         " | median: ", median(per_cell_counts), " | max: ", max(per_cell_counts))
     message("[RCTD debug] cells with co_gene counts < 10: ", sum(per_cell_counts < 10))
-    reference <- Reference(sub_ref, cell_type, require_int = FALSE)
+    reference <- Reference(sub_ref, cell_type, require_int = FALSE, min_UMI = ref_umi_min)
     sample <- SpatialRNA(sub_coords, sub_counts, require_int = FALSE)
     myRCTD <- create.RCTD(
         sample,
