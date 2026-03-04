@@ -13,12 +13,10 @@ parser = argparse.ArgumentParser(description="Generate SPaLaTra QC report")
 parser.add_argument("--consensus", required=True, help="Path to consensus.csv")
 parser.add_argument("--input", required=True, help="Directory of query .h5ad files, or path to a single .h5ad file")
 parser.add_argument("--output", required=True, help="Output HTML path")
-parser.add_argument(
-    "--embedding", default="spatial", help="obsm key for spatial coordinates"
-)
+parser.add_argument("--embedding", default="spatial", help="Unused; kept for CLI compatibility")
 args = parser.parse_args()
 
-# ── Load spatial coordinates ──────────────────────────────────────────────────
+# ── Map cells to samples ───────────────────────────────────────────────────────
 if os.path.isfile(args.input) and args.input.endswith(".h5ad"):
     h5ad_files = [args.input]
 else:
@@ -26,107 +24,41 @@ else:
 if not h5ad_files:
     raise FileNotFoundError(f"No .h5ad files found in {args.input}")
 
-coords_parts = []
+cell_sample = {}
 for path in h5ad_files:
-    adata = anndata.read_h5ad(path)
-    if args.embedding not in adata.obsm:
-        raise KeyError(
-            f"Embedding key '{args.embedding}' not found in {path}. "
-            f"Available keys: {list(adata.obsm.keys())}"
-        )
-    xy = adata.obsm[args.embedding]
-    coords_parts.append(
-        pd.DataFrame(
-            {"x": xy[:, 0], "y": xy[:, 1]},
-            index=adata.obs_names,
-        )
-    )
-coords_df = pd.concat(coords_parts)
+    sample_name = os.path.splitext(os.path.basename(path))[0]
+    adata = anndata.read_h5ad(path, backed="r")
+    for cell in adata.obs_names:
+        cell_sample[cell] = sample_name
+    adata.file.close()
 
-# ── Load consensus ────────────────────────────────────────────────────────────
+# ── Load consensus ─────────────────────────────────────────────────────────────
 consensus = pd.read_csv(args.consensus, index_col=0)
-
-# Join coordinates to consensus
-data = coords_df.join(consensus, how="inner")
+consensus["sample"] = consensus.index.map(cell_sample)
 
 METHOD_COLS = ["tacco", "singler", "rctd", "phispace", "insitutype", "consensus"]
-PRESENT_METHODS = [c for c in METHOD_COLS if c in data.columns]
-
-# Unified color mapping across all labels
-all_labels = pd.unique(data[PRESENT_METHODS].values.ravel())
-all_labels = [l for l in all_labels if pd.notna(l)]
-palette = px.colors.qualitative.Alphabet
-color_map = {
-    label: palette[i % len(palette)] for i, label in enumerate(sorted(all_labels))
-}
+PRESENT_METHODS = [c for c in METHOD_COLS if c in consensus.columns]
+PRIMARY_METHODS = [c for c in ["tacco", "singler", "rctd", "phispace", "insitutype"] if c in consensus.columns]
 
 figures = []
 
-# ── Section 1: Per-method scatter plots ───────────────────────────────────────
-n_methods = len(PRESENT_METHODS)
-cols = 3
-rows = (n_methods + cols - 1) // cols
-
-fig1 = make_subplots(
-    rows=rows,
-    cols=cols,
-    subplot_titles=PRESENT_METHODS,
-    shared_xaxes=False,
-    shared_yaxes=False,
-)
-
-seen_labels = set()
-for i, method in enumerate(PRESENT_METHODS):
-    row = i // cols + 1
-    col = i % cols + 1
-    sub = data[["x", "y", method]].dropna()
-    for label in sub[method].unique():
-        mask = sub[method] == label
-        show_legend = label not in seen_labels
-        seen_labels.add(label)
-        fig1.add_trace(
-            go.Scatter(
-                x=sub.loc[mask, "x"],
-                y=sub.loc[mask, "y"],
-                mode="markers",
-                marker=dict(size=3, color=color_map.get(label, "#888")),
-                name=label,
-                legendgroup=label,
-                showlegend=show_legend,
-                text=label,
-                hovertemplate=f"{method}: {label}<extra></extra>",
-            ),
-            row=row,
-            col=col,
-        )
-    fig1.update_xaxes(showticklabels=False, row=row, col=col)
-    fig1.update_yaxes(showticklabels=False, scaleanchor=f"x{i+1}" if i > 0 else "x", row=row, col=col)
-
-fig1.update_layout(
-    title_text="Per-Method Cell Type Annotations",
-    height=400 * rows,
-    legend=dict(itemsizing="constant"),
-)
-figures.append(("Per-Method Scatter Plots", fig1))
-
-# ── Section 2: Pairwise agreement heatmap ────────────────────────────────────
-primary_methods = [c for c in ["tacco", "singler", "rctd", "phispace", "insitutype"] if c in data.columns]
-n = len(primary_methods)
+# ── Section 1: Pairwise method agreement heatmap ──────────────────────────────
+n = len(PRIMARY_METHODS)
 agreement_matrix = np.zeros((n, n))
-for i, m1 in enumerate(primary_methods):
-    for j, m2 in enumerate(primary_methods):
+for i, m1 in enumerate(PRIMARY_METHODS):
+    for j, m2 in enumerate(PRIMARY_METHODS):
         if m1 == m2:
             agreement_matrix[i, j] = 100.0
             continue
-        valid = data[[m1, m2]].dropna()
+        valid = consensus[[m1, m2]].dropna()
         valid = valid[(valid[m1] != "?") & (valid[m2] != "?")]
         if len(valid) == 0:
             agreement_matrix[i, j] = float("nan")
         else:
             agreement_matrix[i, j] = (valid[m1] == valid[m2]).mean() * 100
 
-agreement_df = pd.DataFrame(agreement_matrix, index=primary_methods, columns=primary_methods)
-fig2 = px.imshow(
+agreement_df = pd.DataFrame(agreement_matrix, index=PRIMARY_METHODS, columns=PRIMARY_METHODS)
+fig1 = px.imshow(
     agreement_df,
     text_auto=".1f",
     color_continuous_scale="Blues",
@@ -135,18 +67,62 @@ fig2 = px.imshow(
     title="Pairwise Method Agreement (% cells with same label)",
     labels=dict(color="Agreement (%)"),
 )
-fig2.update_layout(height=500)
-figures.append(("Pairwise Agreement Heatmap", fig2))
+fig1.update_layout(height=500)
+figures.append(("Pairwise Method Agreement", fig1))
 
-# ── Section 3: Label frequency bar chart ──────────────────────────────────────
+# ── Section 2: Per-sample agreement ───────────────────────────────────────────
+if "agreement_score" in consensus.columns and "sample" in consensus.columns:
+    sample_agg = (
+        consensus.groupby("sample")["agreement_score"]
+        .agg(mean_agreement="mean", n_cells="count")
+        .reset_index()
+        .sort_values("mean_agreement")
+    )
+    fig2 = px.bar(
+        sample_agg,
+        x="sample",
+        y="mean_agreement",
+        hover_data=["n_cells"],
+        title="Mean Agreement Score per Sample (sorted worst → best)",
+        labels={"mean_agreement": "Mean Agreement Score", "sample": "Sample", "n_cells": "Cells"},
+        color="mean_agreement",
+        color_continuous_scale="RdYlGn",
+        range_color=[0, 1],
+    )
+    fig2.update_layout(height=500, xaxis_tickangle=-45, coloraxis_showscale=False)
+    figures.append(("Per-Sample Agreement", fig2))
+
+# ── Section 3: Per-cell-type agreement ────────────────────────────────────────
+if "agreement_score" in consensus.columns and "consensus" in consensus.columns:
+    ct_agg = (
+        consensus.groupby("consensus")["agreement_score"]
+        .agg(mean_agreement="mean", n_cells="count")
+        .reset_index()
+        .sort_values("mean_agreement")
+    )
+    fig3 = px.bar(
+        ct_agg,
+        x="consensus",
+        y="mean_agreement",
+        hover_data=["n_cells"],
+        title="Mean Agreement Score per Cell Type (sorted worst → best)",
+        labels={"mean_agreement": "Mean Agreement Score", "consensus": "Cell Type", "n_cells": "Cells"},
+        color="mean_agreement",
+        color_continuous_scale="RdYlGn",
+        range_color=[0, 1],
+    )
+    fig3.update_layout(height=500, xaxis_tickangle=-45, coloraxis_showscale=False)
+    figures.append(("Per-Cell-Type Agreement", fig3))
+
+# ── Section 4: Label frequency bar chart ──────────────────────────────────────
 freq_rows = []
 for method in PRESENT_METHODS:
-    counts = data[method].value_counts()
+    counts = consensus[method].value_counts()
     for label, count in counts.items():
         freq_rows.append({"Method": method, "Label": label, "Count": int(count)})
 freq_df = pd.DataFrame(freq_rows)
 
-fig3 = px.bar(
+fig4 = px.bar(
     freq_df,
     x="Label",
     y="Count",
@@ -154,26 +130,26 @@ fig3 = px.bar(
     barmode="group",
     title="Cell Type Label Frequency per Method",
 )
-fig3.update_layout(height=500, xaxis_tickangle=-45)
-figures.append(("Label Frequency", fig3))
+fig4.update_layout(height=500, xaxis_tickangle=-45)
+figures.append(("Label Frequency", fig4))
 
-# ── Section 4: Quality metrics ────────────────────────────────────────────────
-fig4 = make_subplots(rows=1, cols=2, subplot_titles=["Agreement Score Distribution", "Ambiguous Cell Count"])
+# ── Section 5: Quality metrics ────────────────────────────────────────────────
+fig5 = make_subplots(rows=1, cols=2, subplot_titles=["Agreement Score Distribution", "Ambiguous Cell Count"])
 
-if "agreement_score" in data.columns:
-    scores = data["agreement_score"].dropna()
-    fig4.add_trace(
+if "agreement_score" in consensus.columns:
+    scores = consensus["agreement_score"].dropna()
+    fig5.add_trace(
         go.Histogram(x=scores, nbinsx=20, name="Agreement Score", marker_color="#636EFA"),
         row=1, col=1,
     )
-    fig4.update_xaxes(title_text="Agreement Score (0–1)", row=1, col=1)
-    fig4.update_yaxes(title_text="Cell Count", row=1, col=1)
+    fig5.update_xaxes(title_text="Agreement Score (0–1)", row=1, col=1)
+    fig5.update_yaxes(title_text="Cell Count", row=1, col=1)
 
-if "is_ambiguous" in data.columns:
-    ambig_counts = data["is_ambiguous"].value_counts().reset_index()
+if "is_ambiguous" in consensus.columns:
+    ambig_counts = consensus["is_ambiguous"].value_counts().reset_index()
     ambig_counts.columns = ["Ambiguous", "Count"]
     ambig_counts["Ambiguous"] = ambig_counts["Ambiguous"].map({True: "Ambiguous", False: "Resolved"})
-    fig4.add_trace(
+    fig5.add_trace(
         go.Bar(
             x=ambig_counts["Ambiguous"],
             y=ambig_counts["Count"],
@@ -182,13 +158,15 @@ if "is_ambiguous" in data.columns:
         ),
         row=1, col=2,
     )
-    fig4.update_xaxes(title_text="Status", row=1, col=2)
-    fig4.update_yaxes(title_text="Cell Count", row=1, col=2)
+    fig5.update_xaxes(title_text="Status", row=1, col=2)
+    fig5.update_yaxes(title_text="Cell Count", row=1, col=2)
 
-fig4.update_layout(title_text="Quality Metrics", height=400, showlegend=False)
-figures.append(("Quality Metrics", fig4))
+fig5.update_layout(title_text="Quality Metrics", height=400, showlegend=False)
+figures.append(("Quality Metrics", fig5))
 
-# ── Write HTML ────────────────────────────────────────────────────────────────
+# ── Write HTML ─────────────────────────────────────────────────────────────────
+import plotly.io as pio
+
 html_parts = [
     "<!DOCTYPE html><html><head><meta charset='utf-8'>",
     "<title>SPaLaTra Report</title>",
@@ -196,8 +174,6 @@ html_parts = [
     "</head><body>",
     "<h1>SPaLaTra Annotation Report</h1>",
 ]
-
-import plotly.io as pio
 
 first = True
 for title, fig in figures:
