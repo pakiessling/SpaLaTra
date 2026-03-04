@@ -114,7 +114,51 @@ if "agreement_score" in consensus.columns and "consensus" in consensus.columns:
     fig3.update_layout(height=500, xaxis_tickangle=-45, coloraxis_showscale=False)
     figures.append(("Per-Cell-Type Agreement", fig3))
 
-# ── Section 4: Label frequency bar chart ──────────────────────────────────────
+# ── Section 4: Cell type confusion heatmap ────────────────────────────────────
+if "consensus" in consensus.columns and PRIMARY_METHODS:
+    # For each cell, record every (consensus_label, method_label) pair where they disagree
+    valid_consensus = consensus[consensus["consensus"].notna() & (consensus["consensus"] != "unknown")]
+    all_labels = sorted(
+        set(valid_consensus["consensus"].unique())
+        | set(valid_consensus[PRIMARY_METHODS].stack().unique())
+    )
+    label_index = {l: i for i, l in enumerate(all_labels)}
+    n_labels = len(all_labels)
+    confusion = np.zeros((n_labels, n_labels), dtype=int)
+
+    for _, row in valid_consensus.iterrows():
+        c = row["consensus"]
+        if c not in label_index:
+            continue
+        ci = label_index[c]
+        for m in PRIMARY_METHODS:
+            ml = row[m]
+            if pd.isna(ml) or ml == "?" or ml == c:
+                continue
+            if ml in label_index:
+                confusion[ci, label_index[ml]] += 1
+
+    # Row-normalize: % of consensus-X cells called Y by at least one method
+    row_sums = valid_consensus["consensus"].value_counts()
+    norm = np.zeros_like(confusion, dtype=float)
+    for i, label in enumerate(all_labels):
+        total = row_sums.get(label, 0)
+        if total > 0:
+            norm[i, :] = confusion[i, :] / total * 100
+
+    confusion_df = pd.DataFrame(norm, index=all_labels, columns=all_labels)
+    fig4 = px.imshow(
+        confusion_df,
+        text_auto=".0f",
+        color_continuous_scale="Reds",
+        title="Cell Type Confusion (% of consensus-X cells called Y by ≥1 method)",
+        labels=dict(x="Called by method", y="Consensus label", color="% cells"),
+        aspect="auto",
+    )
+    fig4.update_layout(height=max(400, 25 * n_labels))
+    figures.append(("Cell Type Confusion", fig4))
+
+# ── Section 5: Label frequency bar chart ──────────────────────────────────────
 freq_rows = []
 for method in PRESENT_METHODS:
     counts = consensus[method].value_counts()
@@ -133,7 +177,7 @@ fig4 = px.bar(
 fig4.update_layout(height=500, xaxis_tickangle=-45)
 figures.append(("Label Frequency", fig4))
 
-# ── Section 5: Quality metrics ────────────────────────────────────────────────
+# ── Section 6: Quality metrics ────────────────────────────────────────────────
 fig5 = make_subplots(rows=1, cols=2, subplot_titles=["Agreement Score Distribution", "Ambiguous Cell Count"])
 
 if "agreement_score" in consensus.columns:
