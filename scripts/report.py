@@ -115,6 +115,9 @@ n = len(primary_methods)
 agreement_matrix = np.zeros((n, n))
 for i, m1 in enumerate(primary_methods):
     for j, m2 in enumerate(primary_methods):
+        if m1 == m2:
+            agreement_matrix[i, j] = 100.0
+            continue
         valid = data[[m1, m2]].dropna()
         valid = valid[(valid[m1] != "?") & (valid[m2] != "?")]
         if len(valid) == 0:
