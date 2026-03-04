@@ -100,6 +100,7 @@ phispace_dfs = []
 insitutype_dfs = []
 
 for root, dirs, files in os.walk(args.input):
+    dirs[:] = [d for d in dirs if d != "sections"]  # skip RCTD scatter intermediates
     for file in sorted(files):
         if file.endswith(".csv"):
             path = os.path.join(root, file)
