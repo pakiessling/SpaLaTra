@@ -157,6 +157,11 @@ for method in args.methods[1:]:
 PRIMARY_COLS = [c for c in ["tacco", "rctd", "singler", "phispace", "insitutype"] if c in ACTIVE_METHODS]
 SECONDARY_COLS = [c for c in ["tacco_2nd", "phispace_2nd", "rctd_2nd"] if c.split("_2nd")[0] in ACTIVE_METHODS]
 
+# Normalize cell type names (some methods sanitize '/' → '_'; align all)
+for col in PRIMARY_COLS + SECONDARY_COLS:
+    if col in combined.columns:
+        combined[col] = combined[col].str.replace("/", "_", regex=False)
+
 combined["consensus"] = combined.apply(
     plurality_consensus, axis=1, primary_cols=PRIMARY_COLS, secondary_cols=SECONDARY_COLS
 )

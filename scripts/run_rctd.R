@@ -62,6 +62,11 @@ ref_counts <- counts(ref)
 cell_type <- ref[[args$ref_column]]
 names(cell_type) <- colnames(ref_counts)
 
+# Replace prohibited characters in cell type names (spacexr disallows '/')
+cell_type <- gsub("/", "_", as.character(cell_type), fixed = TRUE)
+cell_type <- factor(cell_type)
+names(cell_type) <- colnames(ref_counts)
+
 input_counts <- as(input$X, "CsparseMatrix")
 input_counts <- Matrix::t(input_counts)
 rownames(input_counts) <- input$var_names
