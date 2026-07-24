@@ -148,10 +148,33 @@ def _check_unique(dfs, method_name):
 for method in ACTIVE_METHODS:
     _check_unique(method_dfs[method], method)
 
-# Concatenate and join only active methods
-combined = pd.concat(method_dfs[args.methods[0]])
+# Concatenate each method into a single frame
+concatenated = {method: pd.concat(method_dfs[method]) for method in ACTIVE_METHODS}
+
+# Validate index alignment across methods: every method should annotate the same
+# set of cells. A mismatch means an index collision or a dropped/renamed cell, which
+# would silently introduce all-NaN rows on join and corrupt the consensus.
+reference_method = args.methods[0]
+reference_index = concatenated[reference_method].index
 for method in args.methods[1:]:
-    combined = combined.join(pd.concat(method_dfs[method]))
+    this_index = concatenated[method].index
+    missing = reference_index.difference(this_index)
+    extra = this_index.difference(reference_index)
+    if len(missing) > 0 or len(extra) > 0:
+        raise ValueError(
+            f"Cell index mismatch between '{reference_method}' and '{method}': "
+            f"{len(missing)} cells missing from {method} "
+            f"(e.g. {list(missing[:5])}), "
+            f"{len(extra)} unexpected extra cells in {method} "
+            f"(e.g. {list(extra[:5])}). "
+            "All methods must annotate the same cells; check for index collisions "
+            "or dropped cells."
+        )
+
+# Join only active methods (indices verified aligned above)
+combined = concatenated[reference_method]
+for method in args.methods[1:]:
+    combined = combined.join(concatenated[method])
 
 # Build primary/secondary col lists from active methods
 PRIMARY_COLS = [c for c in ["tacco", "rctd", "singler", "phispace", "insitutype"] if c in ACTIVE_METHODS]

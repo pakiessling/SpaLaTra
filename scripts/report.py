@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from sklearn.metrics import cohen_kappa_score, f1_score
 
 parser = argparse.ArgumentParser(description="Generate SPaLaTra QC report")
 parser.add_argument("--consensus", required=True, help="Path to consensus.csv")
@@ -69,6 +70,57 @@ fig1 = px.imshow(
 )
 fig1.update_layout(height=500)
 figures.append(("Pairwise Method Agreement", fig1))
+
+# ── Section 1b: Pairwise Cohen's kappa & macro-F1 ─────────────────────────────
+# Raw agreement is inflated by imbalanced label frequencies (two methods that both
+# over-call a dominant type look concordant). Cohen's kappa corrects for chance
+# agreement, and macro-F1 weights every cell type equally so a method that disagrees
+# on rare types is penalised. A method that scores well on % agreement but poorly on
+# kappa/macro-F1 (RCTD is a common culprit) is a candidate for exclusion.
+def _pairwise_matrix(metric_fn):
+    mat = np.full((n, n), np.nan)
+    for i, m1 in enumerate(PRIMARY_METHODS):
+        for j, m2 in enumerate(PRIMARY_METHODS):
+            if i == j:
+                mat[i, j] = 1.0  # a method vs itself: perfect κ / F1 by definition
+                continue
+            valid = consensus[[m1, m2]].dropna()
+            valid = valid[(valid[m1] != "?") & (valid[m2] != "?")]
+            if len(valid) == 0:
+                continue
+            mat[i, j] = metric_fn(valid[m1], valid[m2])
+    return mat
+
+if n >= 2:
+    kappa_mat = _pairwise_matrix(lambda a, b: cohen_kappa_score(a, b))
+    kappa_df = pd.DataFrame(kappa_mat, index=PRIMARY_METHODS, columns=PRIMARY_METHODS)
+    fig_kappa = px.imshow(
+        kappa_df,
+        text_auto=".2f",
+        color_continuous_scale="RdBu",
+        zmin=-1,
+        zmax=1,
+        title="Pairwise Cohen's κ (chance-corrected agreement; 1 = perfect, 0 = chance)",
+        labels=dict(color="Cohen's κ"),
+    )
+    fig_kappa.update_layout(height=500)
+    figures.append(("Pairwise Cohen's κ", fig_kappa))
+
+    f1_mat = _pairwise_matrix(
+        lambda a, b: f1_score(a, b, average="macro", zero_division=0)
+    )
+    f1_df = pd.DataFrame(f1_mat, index=PRIMARY_METHODS, columns=PRIMARY_METHODS)
+    fig_f1 = px.imshow(
+        f1_df,
+        text_auto=".2f",
+        color_continuous_scale="Greens",
+        zmin=0,
+        zmax=1,
+        title="Pairwise macro-F1 (row = reference labels, per-cell-type mean)",
+        labels=dict(color="macro-F1"),
+    )
+    fig_f1.update_layout(height=500)
+    figures.append(("Pairwise macro-F1", fig_f1))
 
 # ── Section 2: Per-sample agreement ───────────────────────────────────────────
 if "agreement_score" in consensus.columns and "sample" in consensus.columns:
