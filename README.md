@@ -1,6 +1,6 @@
 # SPaLaTra — SPatial Label Transfer
 
-SPaLaTra is a Snakemake pipeline that transfers cell type labels from a single-cell RNA-seq reference to spatial transcriptomics query datasets. It runs five independent annotation methods in parallel and combines them into a single plurality-consensus prediction, along with an interactive HTML report.
+SPaLaTra is a Snakemake pipeline that transfers cell type labels from a single-cell RNA-seq reference to spatial transcriptomics query datasets. It runs seven independent annotation methods in parallel and combines them into a single plurality-consensus prediction, along with an interactive HTML report.
 
 ## Methods
 
@@ -11,6 +11,8 @@ SPaLaTra is a Snakemake pipeline that transfers cell type labels from a single-c
 | [RCTD / spacexr](https://github.com/dmcable/spacexr) | R | `rctd` |
 | [InSituType](https://github.com/Nanostring-Biostats/InSituType) | R | `insitutype` |
 | [PhiSpace](https://github.com/jiadongm/PhiSpace) | R | `phispace` |
+| [NNLS (via TACCO)](https://github.com/simonwm/tacco) | Python | `nnls` |
+| [Tangram (via TACCO)](https://github.com/simonwm/tacco) | Python | `tangram` |
 
 ---
 
@@ -52,6 +54,8 @@ methods:          # remove entries to disable specific methods (min. 2)
   - rctd
   - phispace
   - insitutype
+  - nnls
+  - tangram
 
 embedding: spatial  # obsm key used for coordinates in the HTML report
 ```
@@ -88,6 +92,8 @@ config/config.yaml
 Query .h5ad files + Reference .h5ad
         │
         ├── run_tacco.py        → tacco/{sample}_tacco.csv
+        ├── run_tacco.py --method nnls     → nnls/{sample}_nnls.csv
+        ├── run_tacco.py --method tangram  → tangram/{sample}_tangram.csv
         ├── run_singler.R       → singler/{sample}_singler.csv
         ├── run_rctd.R          → rctd/{sample}_rctd.csv
         ├── run_insitutype.R    → insitutype/{sample}_insitutype.csv
@@ -114,8 +120,8 @@ Each method runs independently per sample. `combine.py` joins all per-cell predi
 
 | Column | Description |
 |---|---|
-| `tacco`, `singler`, `rctd`, `phispace`, `insitutype` | Per-method primary label |
-| `tacco_2nd`, `phispace_2nd`, `rctd_2nd` | Secondary label (used for tie-breaking) |
+| `tacco`, `singler`, `rctd`, `phispace`, `insitutype`, `nnls`, `tangram` | Per-method primary label |
+| `tacco_2nd`, `phispace_2nd`, `rctd_2nd`, `nnls_2nd`, `tangram_2nd` | Secondary label (used for tie-breaking) |
 | `singler_class`, `rctd_class` | Method-specific quality flags |
 | `consensus` | Plurality-consensus label (`"unknown"` if unresolvable) |
 | `agreement_score` | Fraction of methods agreeing with the consensus (0–1) |
@@ -161,6 +167,8 @@ Per-rule overrides:
 | `singler` | 120 GB | 20 |
 | `phispace` | 150 GB | 4 |
 | `tacco` | 50 GB | 4 |
+| `nnls` | 100 GB | 4 |
+| `tangram` | 100 GB | 4 |
 | `rctd` | 150 GB | 5 |
 | `insitutype` | 50 GB | 4 |
 | `consensus` | 50 GB | 1 |

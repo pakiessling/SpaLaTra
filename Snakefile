@@ -18,7 +18,7 @@ def get_sample_input(wildcards):
         return config["input"]
     return os.path.join(INPUT_DIR, wildcards.sample + ".h5ad")
 
-ALL_METHODS = ["tacco", "singler", "rctd", "phispace", "insitutype"]
+ALL_METHODS = ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram"]
 METHODS = config.get("methods", ALL_METHODS)
 
 for m in METHODS:
@@ -89,6 +89,46 @@ rule tacco:
         )
     shell:
         "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --output {output} {params.sample_col_arg} > {log} 2>&1"
+
+rule nnls:
+    input:
+        get_sample_input
+    output:
+        os.path.join(config["output"], "nnls", "{sample}_nnls.csv")
+    conda:
+        "environment.yml"
+    log:
+        os.path.join(LOG_DIR,"nnls_{sample}.log")
+    resources:
+        mem_mb=100_000,
+        cpus_per_task=4
+    params:
+        sample_col_arg = lambda wildcards: (
+            f"--sample_column {config['sample_column']}"
+            if config.get('sample_column') else ""
+        )
+    shell:
+        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --method nnls --output {output} {params.sample_col_arg} > {log} 2>&1"
+
+rule tangram:
+    input:
+        get_sample_input
+    output:
+        os.path.join(config["output"], "tangram", "{sample}_tangram.csv")
+    conda:
+        "environment.yml"
+    log:
+        os.path.join(LOG_DIR,"tangram_{sample}.log")
+    resources:
+        mem_mb=100_000,
+        cpus_per_task=4
+    params:
+        sample_col_arg = lambda wildcards: (
+            f"--sample_column {config['sample_column']}"
+            if config.get('sample_column') else ""
+        )
+    shell:
+        "python scripts/run_tacco.py --input {input} --ref {config[ref]} --ct_column {config[ref_column]} --method tangram --output {output} {params.sample_col_arg} > {log} 2>&1"
 
 rule phispace:
     input:

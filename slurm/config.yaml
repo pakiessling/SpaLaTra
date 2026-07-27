@@ -14,6 +14,12 @@ set-resources:
     tacco:
         mem_mb: 180_000
         cpus_per_task: 4
+    nnls:
+        mem_mb: 180_000
+        cpus_per_task: 4
+    tangram:
+        mem_mb: 180_000
+        cpus_per_task: 4
     singler:
         mem_mb: 120_000
         cpus_per_task: 20

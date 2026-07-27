@@ -37,9 +37,9 @@ for path in h5ad_files:
 consensus = pd.read_csv(args.consensus, index_col=0)
 consensus["sample"] = consensus.index.map(cell_sample)
 
-METHOD_COLS = ["tacco", "singler", "rctd", "phispace", "insitutype", "consensus"]
+METHOD_COLS = ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram", "consensus"]
 PRESENT_METHODS = [c for c in METHOD_COLS if c in consensus.columns]
-PRIMARY_METHODS = [c for c in ["tacco", "singler", "rctd", "phispace", "insitutype"] if c in consensus.columns]
+PRIMARY_METHODS = [c for c in ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram"] if c in consensus.columns]
 
 figures = []
 

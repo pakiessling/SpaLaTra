@@ -5,8 +5,12 @@ import scanpy as sc
 import tacco as tc
 
 
-def label_transfer(adata, ref, ct_column="cell_type", res_column="tacco", **kwargs):
+def label_transfer(adata, ref, ct_column="cell_type", res_column="tacco", method=None, **kwargs):
     assert adata.X.max().is_integer() and ref.X.max().is_integer(), "Data is transformed!"
+    # Pass `method` through only when explicitly set so TACCO's default ("OT") is
+    # used for the plain `tacco` method; `nnls` and `tangram` set it explicitly.
+    if method is not None:
+        kwargs["method"] = method
     result_df = tc.tl.annotate(
         adata,
         ref,
@@ -51,6 +55,12 @@ def main():
         help="What layer in the reference to use",
     )
     parse.add_argument(
+        "--method",
+        type=str,
+        default=None,
+        help="TACCO annotation method (e.g. nnls, tangram). Defaults to TACCO's default (OT).",
+    )
+    parse.add_argument(
         "--output",
         type=str,
         help="Where to save result csv",
@@ -82,7 +92,12 @@ def main():
         args.mc = 1
 
     final_results = label_transfer(
-        full_adata, ref, ct_column=args.ct_column, res_column=args.res_column, multi_center=args.mc
+        full_adata,
+        ref,
+        ct_column=args.ct_column,
+        res_column=args.res_column,
+        method=args.method,
+        multi_center=args.mc,
     )
     # Save the results
     print(f"Saving results to {args.output}")

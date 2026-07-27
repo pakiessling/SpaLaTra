@@ -19,7 +19,7 @@ parser.add_argument(
     "--methods",
     type=str,
     nargs="+",
-    default=["tacco", "singler", "rctd", "phispace", "insitutype"],
+    default=["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram"],
     help="Active methods to include in the consensus.",
 )
 args = parser.parse_args()
@@ -57,15 +57,27 @@ def process_singler(df):
     return out
 
 
-def process_tacco(df):
+def process_argmax(df, name):
     # Primary: argmax col
-    primary = df.idxmax(axis=1).to_frame(name="tacco")
+    primary = df.idxmax(axis=1).to_frame(name=name)
     # Secondary: argmax after zeroing the primary column
     df2 = df.copy()
     for idx in df2.index:
-        df2.loc[idx, primary.loc[idx, "tacco"]] = 0
-    secondary = df2.idxmax(axis=1).to_frame(name="tacco_2nd")
+        df2.loc[idx, primary.loc[idx, name]] = 0
+    secondary = df2.idxmax(axis=1).to_frame(name=f"{name}_2nd")
     return primary.join(secondary)
+
+
+def process_tacco(df):
+    return process_argmax(df, "tacco")
+
+
+def process_nnls(df):
+    return process_argmax(df, "nnls")
+
+
+def process_tangram(df):
+    return process_argmax(df, "tangram")
 
 
 def process_insitutype(df):
@@ -98,6 +110,8 @@ rctd_dfs = []
 singler_dfs = []
 phispace_dfs = []
 insitutype_dfs = []
+nnls_dfs = []
+tangram_dfs = []
 
 for root, dirs, files in os.walk(args.input):
     dirs[:] = [d for d in dirs if d != "sections"]  # skip RCTD scatter intermediates
@@ -121,6 +135,12 @@ for root, dirs, files in os.walk(args.input):
             elif "insitutype" in path:
                 df = process_insitutype(df)
                 insitutype_dfs.append(df)
+            elif "nnls" in path:
+                df = process_nnls(df)
+                nnls_dfs.append(df)
+            elif "tangram" in path:
+                df = process_tangram(df)
+                tangram_dfs.append(df)
             else:
                 raise ValueError(f"Unknown file: {path}")
 
@@ -131,6 +151,8 @@ method_dfs = {
     "singler": singler_dfs,
     "phispace": phispace_dfs,
     "insitutype": insitutype_dfs,
+    "nnls": nnls_dfs,
+    "tangram": tangram_dfs,
 }
 for method in ACTIVE_METHODS:
     if not method_dfs[method]:
@@ -177,8 +199,8 @@ for method in args.methods[1:]:
     combined = combined.join(concatenated[method])
 
 # Build primary/secondary col lists from active methods
-PRIMARY_COLS = [c for c in ["tacco", "rctd", "singler", "phispace", "insitutype"] if c in ACTIVE_METHODS]
-SECONDARY_COLS = [c for c in ["tacco_2nd", "phispace_2nd", "rctd_2nd"] if c.split("_2nd")[0] in ACTIVE_METHODS]
+PRIMARY_COLS = [c for c in ["tacco", "rctd", "singler", "phispace", "insitutype", "nnls", "tangram"] if c in ACTIVE_METHODS]
+SECONDARY_COLS = [c for c in ["tacco_2nd", "phispace_2nd", "rctd_2nd", "nnls_2nd", "tangram_2nd"] if c.split("_2nd")[0] in ACTIVE_METHODS]
 
 # Normalize cell type names (some methods sanitize '/' → '_'; align all)
 for col in PRIMARY_COLS + SECONDARY_COLS:

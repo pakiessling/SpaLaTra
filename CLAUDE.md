@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**SPaLaTra** (SPatial Label Transfer) is a Snakemake pipeline that transfers cell type labels from single-cell RNA-seq reference datasets to spatial transcriptomics query datasets. It runs five independent annotation methods and combines them into a consensus prediction.
+**SPaLaTra** (SPatial Label Transfer) is a Snakemake pipeline that transfers cell type labels from single-cell RNA-seq reference datasets to spatial transcriptomics query datasets. It runs seven independent annotation methods and combines them into a consensus prediction.
 
 ## Running the Pipeline
 
@@ -38,7 +38,7 @@ All pipeline settings live here. Edit this file before running.
 | `input` | yes | Directory of query `.h5ad` files (all processed) |
 | `output` | yes | Output directory |
 | `ref` | yes | Reference single-cell `.h5ad` file |
-| `methods` | no | List of methods to run; defaults to all five. Minimum 2 required. |
+| `methods` | no | List of methods to run; defaults to all seven. Minimum 2 required. |
 | `ref_column` | no | Column in reference `.h5ad` with cell type labels (default: `cell_subtype`) |
 | `embedding` | no | `obsm` key for report plots (default: `spatial`) |
 | `sample_column` | no | `obs` column identifying tissue sections; if set, RCTD runs per-section to avoid overlapping coordinate issues |
@@ -59,6 +59,8 @@ The `Snakefile` orchestrates six rules: one per annotation method plus a final c
 Query .h5ad files + Reference .h5ad
         │
         ├── run_tacco.py        (Python, TACCO)
+        ├── run_tacco.py --method nnls     (Python, TACCO / NNLS)
+        ├── run_tacco.py --method tangram  (Python, TACCO / Tangram)
         ├── run_singler.R       (R, SingleR)
         ├── run_rctd.R          (R, RCTD / spacexr)
         ├── run_insitutype.R    (R, InSituType)
@@ -67,7 +69,7 @@ Query .h5ad files + Reference .h5ad
           combine.py  →  consensus.csv
 ```
 
-Each method script is invoked independently per sample and writes a CSV of per-cell predictions. `scripts/combine.py` joins all five CSVs and computes the mode across methods as the consensus label.
+Each method script is invoked independently per sample and writes a CSV of per-cell predictions. `scripts/combine.py` joins all seven CSVs and computes the mode across methods as the consensus label.
 
 ## Input Data Requirements
 
@@ -81,6 +83,8 @@ Each method script is invoked independently per sample and writes a CSV of per-c
 | Method | Script | Output column used |
 |---|---|---|
 | TACCO | `run_tacco.py` | argmax of probability matrix |
+| NNLS | `run_tacco.py --method nnls` | argmax of probability matrix |
+| Tangram | `run_tacco.py --method tangram` | argmax of probability matrix |
 | SingleR | `run_singler.R` | `labels`; quality flagged via `pruned.labels` |
 | RCTD | `run_rctd.R` | `first_type` from `spot_class` |
 | InSituType | `run_insitutype.R` | raw prediction |
@@ -114,6 +118,8 @@ Default: 150 GB RAM, 5 CPUs, 12 h walltime. Per-rule overrides:
 |---|---|---|---|
 | consensus | 50 GB | 1 | — |
 | tacco | 50 GB | 4 | — |
+| nnls | 100 GB | 4 | — |
+| tangram | 100 GB | 4 | — |
 | singler | 120 GB | 20 | — |
 | insitutype | 50 GB | 4 | — |
 | phispace | 150 GB | 4 | — |
