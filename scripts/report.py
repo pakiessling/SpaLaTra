@@ -12,9 +12,15 @@ from sklearn.metrics import cohen_kappa_score, f1_score
 
 parser = argparse.ArgumentParser(description="Generate SPaLaTra QC report")
 parser.add_argument("--consensus", required=True, help="Path to consensus.csv")
-parser.add_argument("--input", required=True, help="Directory of query .h5ad files, or path to a single .h5ad file")
+parser.add_argument(
+    "--input",
+    required=True,
+    help="Directory of query .h5ad files, or path to a single .h5ad file",
+)
 parser.add_argument("--output", required=True, help="Output HTML path")
-parser.add_argument("--embedding", default="spatial", help="Unused; kept for CLI compatibility")
+parser.add_argument(
+    "--embedding", default="spatial", help="Unused; kept for CLI compatibility"
+)
 args = parser.parse_args()
 
 # ── Map cells to samples ───────────────────────────────────────────────────────
@@ -35,11 +41,27 @@ for path in h5ad_files:
 
 # ── Load consensus ─────────────────────────────────────────────────────────────
 consensus = pd.read_csv(args.consensus, index_col=0)
-consensus["sample"] = consensus.index.map(cell_sample)
+if "sample" not in consensus.columns:
+    # Older consensus.csv without a sample column: fall back to the barcode lookup
+    # (only correct when barcodes are unique across query files).
+    consensus["sample"] = consensus.index.map(cell_sample)
 
-METHOD_COLS = ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram", "consensus"]
+METHOD_COLS = [
+    "tacco",
+    "singler",
+    "rctd",
+    "phispace",
+    "insitutype",
+    "nnls",
+    "tangram",
+    "consensus",
+]
 PRESENT_METHODS = [c for c in METHOD_COLS if c in consensus.columns]
-PRIMARY_METHODS = [c for c in ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram"] if c in consensus.columns]
+PRIMARY_METHODS = [
+    c
+    for c in ["tacco", "singler", "rctd", "phispace", "insitutype", "nnls", "tangram"]
+    if c in consensus.columns
+]
 
 figures = []
 
@@ -58,7 +80,9 @@ for i, m1 in enumerate(PRIMARY_METHODS):
         else:
             agreement_matrix[i, j] = (valid[m1] == valid[m2]).mean() * 100
 
-agreement_df = pd.DataFrame(agreement_matrix, index=PRIMARY_METHODS, columns=PRIMARY_METHODS)
+agreement_df = pd.DataFrame(
+    agreement_matrix, index=PRIMARY_METHODS, columns=PRIMARY_METHODS
+)
 fig1 = px.imshow(
     agreement_df,
     text_auto=".1f",
@@ -70,6 +94,7 @@ fig1 = px.imshow(
 )
 fig1.update_layout(height=500)
 figures.append(("Pairwise Method Agreement", fig1))
+
 
 # ── Section 1b: Pairwise Cohen's kappa & macro-F1 ─────────────────────────────
 # Raw agreement is inflated by imbalanced label frequencies (two methods that both
@@ -90,6 +115,7 @@ def _pairwise_matrix(metric_fn):
                 continue
             mat[i, j] = metric_fn(valid[m1], valid[m2])
     return mat
+
 
 if n >= 2:
     kappa_mat = _pairwise_matrix(lambda a, b: cohen_kappa_score(a, b))
@@ -136,7 +162,11 @@ if "agreement_score" in consensus.columns and "sample" in consensus.columns:
         y="mean_agreement",
         hover_data=["n_cells"],
         title="Mean Agreement Score per Sample (sorted worst → best)",
-        labels={"mean_agreement": "Mean Agreement Score", "sample": "Sample", "n_cells": "Cells"},
+        labels={
+            "mean_agreement": "Mean Agreement Score",
+            "sample": "Sample",
+            "n_cells": "Cells",
+        },
         color="mean_agreement",
         color_continuous_scale="RdYlGn",
         range_color=[0, 1],
@@ -158,7 +188,11 @@ if "agreement_score" in consensus.columns and "consensus" in consensus.columns:
         y="mean_agreement",
         hover_data=["n_cells"],
         title="Mean Agreement Score per Cell Type (sorted worst → best)",
-        labels={"mean_agreement": "Mean Agreement Score", "consensus": "Cell Type", "n_cells": "Cells"},
+        labels={
+            "mean_agreement": "Mean Agreement Score",
+            "consensus": "Cell Type",
+            "n_cells": "Cells",
+        },
         color="mean_agreement",
         color_continuous_scale="RdYlGn",
         range_color=[0, 1],
@@ -169,7 +203,9 @@ if "agreement_score" in consensus.columns and "consensus" in consensus.columns:
 # ── Section 4: Cell type confusion heatmap ────────────────────────────────────
 if "consensus" in consensus.columns and PRIMARY_METHODS:
     # For each cell, record every (consensus_label, method_label) pair where they disagree
-    valid_consensus = consensus[consensus["consensus"].notna() & (consensus["consensus"] != "unknown")]
+    valid_consensus = consensus[
+        consensus["consensus"].notna() & (consensus["consensus"] != "unknown")
+    ]
     all_labels = sorted(
         set(valid_consensus["consensus"].unique())
         | set(valid_consensus[PRIMARY_METHODS].stack().unique())
@@ -230,13 +266,20 @@ fig4.update_layout(height=500, xaxis_tickangle=-45)
 figures.append(("Label Frequency", fig4))
 
 # ── Section 6: Quality metrics ────────────────────────────────────────────────
-fig5 = make_subplots(rows=1, cols=2, subplot_titles=["Agreement Score Distribution", "Ambiguous Cell Count"])
+fig5 = make_subplots(
+    rows=1,
+    cols=2,
+    subplot_titles=["Agreement Score Distribution", "Ambiguous Cell Count"],
+)
 
 if "agreement_score" in consensus.columns:
     scores = consensus["agreement_score"].dropna()
     fig5.add_trace(
-        go.Histogram(x=scores, nbinsx=20, name="Agreement Score", marker_color="#636EFA"),
-        row=1, col=1,
+        go.Histogram(
+            x=scores, nbinsx=20, name="Agreement Score", marker_color="#636EFA"
+        ),
+        row=1,
+        col=1,
     )
     fig5.update_xaxes(title_text="Agreement Score (0–1)", row=1, col=1)
     fig5.update_yaxes(title_text="Cell Count", row=1, col=1)
@@ -244,7 +287,9 @@ if "agreement_score" in consensus.columns:
 if "is_ambiguous" in consensus.columns:
     ambig_counts = consensus["is_ambiguous"].value_counts().reset_index()
     ambig_counts.columns = ["Ambiguous", "Count"]
-    ambig_counts["Ambiguous"] = ambig_counts["Ambiguous"].map({True: "Ambiguous", False: "Resolved"})
+    ambig_counts["Ambiguous"] = ambig_counts["Ambiguous"].map(
+        {True: "Ambiguous", False: "Resolved"}
+    )
     fig5.add_trace(
         go.Bar(
             x=ambig_counts["Ambiguous"],
@@ -252,7 +297,8 @@ if "is_ambiguous" in consensus.columns:
             name="Ambiguity",
             marker_color=["#EF553B", "#00CC96"],
         ),
-        row=1, col=2,
+        row=1,
+        col=2,
     )
     fig5.update_xaxes(title_text="Status", row=1, col=2)
     fig5.update_yaxes(title_text="Cell Count", row=1, col=2)
